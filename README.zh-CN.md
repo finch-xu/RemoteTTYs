@@ -1,6 +1,13 @@
 # RemoteTTYs
 
-通过浏览器远程控制本地机器上的终端。工作在 PTY 字节流层面 — 可以运行任何程序：claude code、vim、htop 或任何 CLI 工具。中继服务器从不解析终端内容。
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](agent/go.mod)
+[![Node.js](https://img.shields.io/badge/Node.js-22+-339933?logo=node.js&logoColor=white)](packages/relay/package.json)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](packages/web/package.json)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-lightgrey)]()
+
+在浏览器中远程访问自己家里Mac的终端。直接运行 Claude Code、Codex、vim 等任何 CLI 工具和命令。
 
 **[English / 英文文档](README.md)**
 

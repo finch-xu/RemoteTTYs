@@ -1,6 +1,13 @@
 # RemoteTTYs
 
-Remotely control terminals on your local machines from a web browser. Works at the PTY byte-stream level — run anything inside: claude code, vim, htop, or any CLI tool. The relay never parses terminal content.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](agent/go.mod)
+[![Node.js](https://img.shields.io/badge/Node.js-22+-339933?logo=node.js&logoColor=white)](packages/relay/package.json)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](packages/web/package.json)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-lightgrey)]()
+
+Remotely access the terminal on your home Mac from a browser. Run Claude Code, Codex, vim, or any CLI tool and command directly.
 
 **[Chinese / 中文文档](README.zh-CN.md)**
 
