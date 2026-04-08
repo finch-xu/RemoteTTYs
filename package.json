@@ -1,0 +1,7 @@
+{
+  "name": "remotettys",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ]
+}

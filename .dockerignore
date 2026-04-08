@@ -1,0 +1,16 @@
+node_modules
+.git
+agent
+bin
+mydata
+*.md
+.claude
+.env
+.env.*
+!.env.example
+.vscode
+.idea
+packages/relay/data
+packages/relay/public
+packages/relay/dist
+packages/web/dist

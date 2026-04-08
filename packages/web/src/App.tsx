@@ -1,0 +1,165 @@
+import { useState, useEffect } from 'react';
+import { useWebSocket } from './hooks/useWebSocket';
+import { useAgentStore } from './hooks/useAgentStore';
+import { ThemeContext, useTheme, useThemeProvider } from './hooks/useTheme';
+import { Sidebar } from './components/Sidebar';
+import { TerminalTabs } from './components/TerminalTabs';
+import { LoginPage } from './components/LoginPage';
+import { SetupPage } from './components/SetupPage';
+import { SettingsPage } from './components/SettingsPage';
+import { UI_FONT } from './lib/theme';
+
+type AppView = 'terminal' | 'settings';
+type AuthState = 'loading' | 'authenticated' | 'unauthenticated';
+
+interface Preferences {
+  uiTheme?: string;
+  terminalTheme?: string;
+}
+
+function App() {
+  const [authState, setAuthState] = useState<AuthState>('loading');
+  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+  const [preferences, setPreferences] = useState<Preferences | undefined>();
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/setup/status').then(r => r.json()).then(d => d.needsSetup),
+      fetch('/api/auth/me').then(r => r.ok ? r.json() : null),
+    ]).then(([setup, meData]) => {
+      setNeedsSetup(setup);
+      if (meData) {
+        setAuthState('authenticated');
+        setPreferences(meData.preferences);
+      } else {
+        setAuthState('unauthenticated');
+      }
+    }).catch(() => {
+      setNeedsSetup(false);
+      setAuthState('unauthenticated');
+    });
+  }, []);
+
+  // Handle 401 from API calls (session expired)
+  useEffect(() => {
+    const handler = () => setAuthState('unauthenticated');
+    window.addEventListener('rttys:unauthorized', handler);
+    return () => window.removeEventListener('rttys:unauthorized', handler);
+  }, []);
+
+  // Loading
+  if (needsSetup === null || authState === 'loading') {
+    return (
+      <div style={loadingStyle}>
+        <span style={{ color: '#8C8580', fontSize: 20 }}>{'\u25cf'}</span> Loading...
+      </div>
+    );
+  }
+
+  // First-time setup
+  if (needsSetup) {
+    return <SetupPage onSetupComplete={() => { setNeedsSetup(false); setAuthState('authenticated'); }} />;
+  }
+
+  if (authState !== 'authenticated') {
+    return <LoginPage onLogin={() => {
+      // Re-fetch preferences after login
+      fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(data => {
+        if (data) setPreferences(data.preferences);
+      }).catch(() => {});
+      setAuthState('authenticated');
+    }} />;
+  }
+
+  return <ThemedApp preferences={preferences} onLogout={async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    setAuthState('unauthenticated');
+    setPreferences(undefined);
+  }} />;
+}
+
+function ThemedApp({ preferences, onLogout }: { preferences?: Preferences; onLogout: () => void }) {
+  const themeValue = useThemeProvider(preferences);
+
+  return (
+    <ThemeContext.Provider value={themeValue}>
+      <MainApp onLogout={onLogout} />
+    </ThemeContext.Provider>
+  );
+}
+
+function MainApp({ onLogout }: { onLogout: () => void }) {
+  const { ui } = useTheme();
+  const { connected, send, subscribe } = useWebSocket();
+  const { agents, selectedAgent, selectedAgentId, selectAgent } = useAgentStore(subscribe);
+  const [view, setView] = useState<AppView>('terminal');
+
+  if (!connected && view !== 'settings') {
+    return (
+      <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary }}>
+        <span style={{ color: ui.textSecondary, fontSize: 20 }}>{'\u25cf'}</span> Connecting to relay...
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', width: '100vw', height: '100vh', background: ui.bg }}>
+      <Sidebar
+        agents={agents}
+        selectedAgentId={selectedAgentId}
+        onSelectAgent={(id) => { selectAgent(id); setView('terminal'); }}
+        currentView={view}
+        onViewChange={setView}
+        onLogout={onLogout}
+      />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {view === 'settings' ? (
+          <SettingsPage />
+        ) : !selectedAgent ? (
+          <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary }}>
+            <span style={{ color: ui.warning, fontSize: 20 }}>{'\u25cf'}</span> Waiting for agent to connect...
+          </div>
+        ) : !selectedAgent.online ? (
+          <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary }}>
+            <span style={{ color: ui.textMuted, fontSize: 20 }}>{'\u25cf'}</span> {selectedAgent.name} is offline
+          </div>
+        ) : (
+          <TerminalTabs
+            key={selectedAgent.id}
+            agentId={selectedAgent.id}
+            agentName={selectedAgent.name}
+            existingSessions={selectedAgent.sessions}
+            send={send}
+            subscribe={subscribe}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+const loadingStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flex: 1,
+  height: '100vh',
+  background: '#FAF7F2',
+  color: '#2D2B28',
+  fontFamily: UI_FONT,
+  fontSize: 16,
+  gap: 8,
+};
+
+const statusStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flex: 1,
+  height: '100vh',
+  fontFamily: UI_FONT,
+  fontSize: 16,
+  gap: 8,
+};
+
+export default App;

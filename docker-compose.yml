@@ -1,0 +1,14 @@
+services:
+  relay:
+    build: .
+    ports:
+      - "${PORT:-8080}:8080"
+    volumes:
+      - rttys-data:/app/data
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
+
+volumes:
+  rttys-data:

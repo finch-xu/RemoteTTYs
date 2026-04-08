@@ -1,0 +1,8 @@
+# RemoteTTYs Agent Configuration
+# Place this file as config.yaml next to the rttys-agent binary,
+# or at ~/.rttys/config.yaml
+
+relay: wss://your-server.com/ws/agent
+token: your-agent-token
+name: my-machine
+shell: /bin/zsh

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  agent:
+    name: Go Agent
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Build
+        run: cd agent && go build ./...
+      - name: Vet
+        run: cd agent && go vet ./...
+
+  relay:
+    name: Relay + Web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install
+      - name: Type-check relay
+        run: cd packages/relay && npx tsc --noEmit
+      - name: Type-check web
+        run: cd packages/web && npx tsc --noEmit
+      - name: Build web
+        run: cd packages/web && npx vite build

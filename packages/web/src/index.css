@@ -1,0 +1,27 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #FAF7F2;
+  transition: background-color 0.2s;
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Fix: hide IME composition artifacts in ghostty-web terminal containers.
+   ghostty-web sets contenteditable="true" on the container div, causing
+   browser-rendered IME composition text to appear as a visible white bar. */
+div[contenteditable="true"] {
+  caret-color: transparent;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  overflow: hidden;
+}

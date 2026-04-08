@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-agent:
+    name: Build Agent (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+            name: macOS-arm64
+          - goos: darwin
+            goarch: amd64
+            name: macOS-x64
+          - goos: linux
+            goarch: amd64
+            name: Linux-x64
+          - goos: linux
+            goarch: arm64
+            name: Linux-arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: |
+          cd agent
+          go build -trimpath -ldflags="-s -w" -o ../rttys-agent-${{ matrix.name }} .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rttys-agent-${{ matrix.name }}
+          path: rttys-agent-${{ matrix.name }}
+
+  build-relay:
+    name: Build Relay + Web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: cd packages/relay && npx tsc
+      - run: cd packages/web && npx vite build
+      - run: cp -r packages/web/dist packages/relay/public
+      - name: Package relay
+        run: tar -czf rttys-relay.tar.gz -C packages/relay dist public package.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rttys-relay
+          path: rttys-relay.tar.gz
+
+  build-docker:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract version from tag
+        id: version
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/remotettys:${{ steps.version.outputs.tag }}
+            ghcr.io/${{ github.repository_owner }}/remotettys:latest
+
+  release:
+    name: Create Release
+    needs: [build-agent, build-relay, build-docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/rttys-agent-*/rttys-agent-*
+            artifacts/rttys-relay/rttys-relay.tar.gz
+          generate_release_notes: true
