@@ -4,6 +4,8 @@
 
 **[English / 英文文档](README.md)**
 
+<img src="images/meme.jpg" width="400" />
+
 ## 工作原理
 
 ```

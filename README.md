@@ -4,6 +4,8 @@ Remotely control terminals on your local machines from a web browser. Works at t
 
 **[Chinese / 中文文档](README.zh-CN.md)**
 
+<img src="images/meme.jpg" width="400" />
+
 ## How It Works
 
 ```
