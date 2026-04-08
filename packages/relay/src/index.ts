@@ -47,6 +47,7 @@ import {
   clearAgentFingerprint,
 } from './db.js';
 import { initServerKey, getServerPublicKey, signChallenge } from './serverKey.js';
+import { createRateLimiter, RateLimitStore } from './rateLimit.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -61,6 +62,11 @@ const app = express();
 // Trust first proxy (e.g., nginx, cloud LB) so req.ip reflects the real client IP
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '10kb' }));
+
+// Rate limiters: strict for sensitive ops, standard for authenticated APIs, relaxed for read-only
+const strictLimiter = createRateLimiter(15 * 60 * 1000, 10);   // 10 req / 15 min
+const standardLimiter = createRateLimiter(60 * 1000, 60);       // 60 req / min
+const relaxedLimiter = createRateLimiter(60 * 1000, 120);       // 120 req / min
 
 // Security headers
 app.use((_req, res, next) => {
@@ -210,11 +216,11 @@ function validatePassword(password: string): string | null {
 
 // --- Setup (first-time initialization) ---
 
-app.get('/api/setup/status', (_req, res) => {
+app.get('/api/setup/status', relaxedLimiter, (_req, res) => {
   res.json({ needsSetup: !hasUsers() });
 });
 
-app.post('/api/setup/init', (req, res) => {
+app.post('/api/setup/init', strictLimiter, (req, res) => {
   if (hasUsers()) {
     res.status(403).json({ error: 'Setup already completed' });
     return;
@@ -237,31 +243,10 @@ app.post('/api/setup/init', (req, res) => {
 
 // --- Auth ---
 
-// Simple in-memory rate limiter for login attempts
-const loginAttempts = new Map<string, { count: number; resetAt: number }>();
-const LOGIN_MAX_ATTEMPTS = 10;
-const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+// Per-username login rate limiter (IP-based limiting handled by strictLimiter middleware)
+const loginLimiter = new RateLimitStore(15 * 60 * 1000, 10);
 
-function checkLoginRateLimit(key: string): boolean {
-  const now = Date.now();
-  const entry = loginAttempts.get(key);
-  if (!entry || now > entry.resetAt) {
-    loginAttempts.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
-    return true;
-  }
-  entry.count++;
-  return entry.count <= LOGIN_MAX_ATTEMPTS;
-}
-
-// Clean up expired rate limit entries periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of loginAttempts.entries()) {
-    if (now > entry.resetAt) loginAttempts.delete(key);
-  }
-}, 5 * 60 * 1000);
-
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', strictLimiter, (req, res) => {
   const { username, password } = req.body;
   const ip = req.ip || req.socket.remoteAddress || '';
 
@@ -270,8 +255,7 @@ app.post('/api/auth/login', (req, res) => {
     return;
   }
 
-  // Rate limit by IP and by username
-  if (!checkLoginRateLimit(`ip:${ip}`) || !checkLoginRateLimit(`user:${username}`)) {
+  if (!loginLimiter.check(`user:${username}`)) {
     audit('login_rate_limited', username, `ip=${ip}`);
     res.status(429).json({ error: 'Too many login attempts. Try again later.' });
     return;
@@ -288,7 +272,7 @@ app.post('/api/auth/login', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/auth/me', (req, res) => {
+app.get('/api/auth/me', relaxedLimiter, (req, res) => {
   const token = parseCookie(req.headers.cookie, 'rttys-session');
   if (!token) {
     res.status(401).json({ error: 'Not authenticated' });
@@ -303,12 +287,12 @@ app.get('/api/auth/me', (req, res) => {
   res.json({ username: result.username, preferences: getUserPreferences(result.username) });
 });
 
-app.post('/api/auth/logout', (_req, res) => {
+app.post('/api/auth/logout', standardLimiter, (_req, res) => {
   clearAuthCookies(res);
   res.json({ ok: true });
 });
 
-app.put('/api/preferences', requireAuth, requireCSRF, (req, res) => {
+app.put('/api/preferences', standardLimiter, requireAuth, requireCSRF, (req, res) => {
   const { uiTheme, terminalTheme } = req.body;
   const prefs: Record<string, unknown> = {};
   if (typeof uiTheme === 'string') prefs.uiTheme = uiTheme;
@@ -319,7 +303,7 @@ app.put('/api/preferences', requireAuth, requireCSRF, (req, res) => {
 
 // --- Agents ---
 
-app.get('/api/agents', requireAuth, (_req, res) => {
+app.get('/api/agents', standardLimiter, requireAuth, (_req, res) => {
   const dbAgents = listAgentsFromDB();
   const onlineAgents = getAllAgents();
   const sessionMap = new Map<string, string[]>();
@@ -339,7 +323,7 @@ app.get('/api/agents', requireAuth, (_req, res) => {
   res.json(agents);
 });
 
-app.delete('/api/agents/:id', requireAuth, requireCSRF, (req, res) => {
+app.delete('/api/agents/:id', standardLimiter, requireAuth, requireCSRF, (req, res) => {
   const id = req.params.id as string;
   if (deleteAgentFromDB(id)) {
     audit('agent_delete', (req as AuthRequest).username, `agentId=${id}`);
@@ -349,7 +333,7 @@ app.delete('/api/agents/:id', requireAuth, requireCSRF, (req, res) => {
   }
 });
 
-app.delete('/api/agents/:id/fingerprint', requireAuth, requireCSRF, (req, res) => {
+app.delete('/api/agents/:id/fingerprint', standardLimiter, requireAuth, requireCSRF, (req, res) => {
   const id = req.params.id as string;
   if (clearAgentFingerprint(id)) {
     audit('agent_fingerprint_reset', (req as AuthRequest).username, `agentId=${id}`);
@@ -361,17 +345,17 @@ app.delete('/api/agents/:id/fingerprint', requireAuth, requireCSRF, (req, res) =
 
 // --- Server Key ---
 
-app.get('/api/server-key', requireAuth, (_req, res) => {
+app.get('/api/server-key', standardLimiter, requireAuth, (_req, res) => {
   res.json({ publicKey: getServerPublicKey() });
 });
 
 // --- User Management ---
 
-app.get('/api/users', requireAuth, (_req, res) => {
+app.get('/api/users', standardLimiter, requireAuth, (_req, res) => {
   res.json(listUsers());
 });
 
-app.post('/api/users', requireAuth, requireCSRF, (req, res) => {
+app.post('/api/users', standardLimiter, requireAuth, requireCSRF, (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     res.status(400).json({ error: 'Username and password required' });
@@ -395,7 +379,7 @@ app.post('/api/users', requireAuth, requireCSRF, (req, res) => {
   }
 });
 
-app.delete('/api/users/:username', requireAuth, requireCSRF, (req, res) => {
+app.delete('/api/users/:username', standardLimiter, requireAuth, requireCSRF, (req, res) => {
   const target = req.params.username as string;
   if (target === (req as AuthRequest).username) {
     res.status(400).json({ error: 'Cannot delete yourself' });
@@ -409,7 +393,7 @@ app.delete('/api/users/:username', requireAuth, requireCSRF, (req, res) => {
   }
 });
 
-app.put('/api/users/:username/password', requireAuth, requireCSRF, (req, res) => {
+app.put('/api/users/:username/password', standardLimiter, requireAuth, requireCSRF, (req, res) => {
   const target = req.params.username as string;
   // Users can only change their own password
   if (target !== (req as AuthRequest).username) {
@@ -436,7 +420,7 @@ app.put('/api/users/:username/password', requireAuth, requireCSRF, (req, res) =>
 
 // --- Agent Token Management ---
 
-app.get('/api/tokens', requireAuth, (_req, res) => {
+app.get('/api/tokens', standardLimiter, requireAuth, (_req, res) => {
   const tokens = listAgentTokens();
   const onlineAgents = getAllAgents();
   const tokenOnlineMap = new Map<string, string[]>();
@@ -454,7 +438,7 @@ app.get('/api/tokens', requireAuth, (_req, res) => {
   res.json(enriched);
 });
 
-app.post('/api/tokens', requireAuth, requireCSRF, (req, res) => {
+app.post('/api/tokens', standardLimiter, requireAuth, requireCSRF, (req, res) => {
   const { label, notes } = req.body;
   if (!label) {
     res.status(400).json({ error: 'Label is required' });
@@ -470,7 +454,7 @@ app.post('/api/tokens', requireAuth, requireCSRF, (req, res) => {
   }
 });
 
-app.put('/api/tokens/:id/enabled', requireAuth, requireCSRF, (req, res) => {
+app.put('/api/tokens/:id/enabled', standardLimiter, requireAuth, requireCSRF, (req, res) => {
   const id = parseInt(req.params.id as string, 10);
   const { enabled } = req.body;
   if (typeof enabled !== 'boolean') {
@@ -490,7 +474,7 @@ app.put('/api/tokens/:id/enabled', requireAuth, requireCSRF, (req, res) => {
   res.json({ ok: true });
 });
 
-app.delete('/api/tokens/:token', requireAuth, requireCSRF, (req, res) => {
+app.delete('/api/tokens/:token', standardLimiter, requireAuth, requireCSRF, (req, res) => {
   const token = req.params.token as string;
   disconnectAgentsByToken(token);
   if (deleteAgentToken(token)) {
@@ -503,7 +487,7 @@ app.delete('/api/tokens/:token', requireAuth, requireCSRF, (req, res) => {
 
 // --- Audit Log ---
 
-app.get('/api/audit', requireAuth, (req, res) => {
+app.get('/api/audit', standardLimiter, requireAuth, (req, res) => {
   const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 100, 1), 1000);
   res.json(getAuditLogs(limit));
 });
@@ -512,7 +496,7 @@ app.get('/api/audit', requireAuth, (req, res) => {
 
 const publicDir = path.join(__dirname, '..', 'public');
 app.use(express.static(publicDir));
-app.get('*', (_req, res) => {
+app.get('*', relaxedLimiter, (_req, res) => {
   res.sendFile(path.join(publicDir, 'index.html'));
 });
 
