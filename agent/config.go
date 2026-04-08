@@ -8,12 +8,13 @@ import (
 )
 
 type Config struct {
-	Relay     string `yaml:"relay"`
-	Token     string `yaml:"token"`
-	Name      string `yaml:"name"`
-	Shell     string `yaml:"shell"`
-	ServerKey string `yaml:"server_key"`
-	Insecure  bool   `yaml:"insecure,omitempty"`
+	Relay      string `yaml:"relay"`
+	Token      string `yaml:"token"`
+	Name       string `yaml:"name"`
+	Shell      string `yaml:"shell"`
+	ServerKey  string `yaml:"server_key"`
+	Insecure   bool   `yaml:"insecure,omitempty"`
+	MaxRetries int    `yaml:"max_retries,omitempty"`
 }
 
 const configFileName = "config.yaml"
@@ -50,8 +51,9 @@ func findConfigFile() string {
 
 func LoadConfig() *Config {
 	cfg := &Config{
-		Relay: "ws://localhost:8080/ws/agent",
-		Shell: "/bin/sh",
+		Relay:      "ws://localhost:8080/ws/agent",
+		Shell:      "/bin/sh",
+		MaxRetries: 10,
 	}
 
 	if sh := os.Getenv("SHELL"); sh != "" {
@@ -91,6 +93,9 @@ func LoadConfig() *Config {
 	}
 	if fileCfg.ServerKey != "" {
 		cfg.ServerKey = fileCfg.ServerKey
+	}
+	if fileCfg.MaxRetries != 0 {
+		cfg.MaxRetries = fileCfg.MaxRetries
 	}
 
 	return cfg

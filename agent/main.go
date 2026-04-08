@@ -35,6 +35,7 @@ func main() {
 	nameFlag := flag.String("name", "", "agent display name")
 	shellFlag := flag.String("shell", "", "shell to spawn for new sessions")
 	insecureFlag := flag.Bool("insecure", false, "skip TLS certificate verification (dev only)")
+	maxRetriesFlag := flag.Int("max-retries", 0, "max consecutive reconnection attempts (0 = use config default)")
 	daemonFlag := flag.Bool("d", false, "run as background daemon")
 	flag.Parse()
 
@@ -51,6 +52,9 @@ func main() {
 	}
 	if *insecureFlag {
 		config.Insecure = true
+	}
+	if *maxRetriesFlag != 0 {
+		config.MaxRetries = *maxRetriesFlag
 	}
 
 	if *daemonFlag {
@@ -84,7 +88,11 @@ func runForeground(config *Config) {
 		os.Exit(0)
 	}()
 
-	client.Run()
+	if err := client.Run(); err != nil {
+		log.Printf("agent exited: %v", err)
+		removePIDFile()
+		os.Exit(1)
+	}
 }
 
 func runDaemon() {
@@ -194,6 +202,13 @@ func runInit() {
 	fmt.Printf("Shell [%s]: ", config.Shell)
 	if line, _ := reader.ReadString('\n'); strings.TrimSpace(line) != "" {
 		config.Shell = strings.TrimSpace(line)
+	}
+
+	fmt.Printf("Max retries, 0=unlimited [%d]: ", config.MaxRetries)
+	if line, _ := reader.ReadString('\n'); strings.TrimSpace(line) != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(line)); err == nil {
+			config.MaxRetries = n
+		}
 	}
 
 	// Write config.yaml next to the executable

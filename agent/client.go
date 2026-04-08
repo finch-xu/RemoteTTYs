@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -127,20 +128,27 @@ func (c *Client) verifyServerChallenge() error {
 	return nil
 }
 
-func (c *Client) Run() {
+func (c *Client) Run() error {
 	backoff := time.Second
 	const maxBackoff = 30 * time.Second
+	retries := 0
 
 	for {
 		if err := c.Connect(); err != nil {
-			log.Printf("connect failed: %v, retrying in %s...", err, backoff)
+			retries++
+			if c.config.MaxRetries > 0 && retries >= c.config.MaxRetries {
+				return fmt.Errorf("max retries (%d) exceeded, last error: %v", c.config.MaxRetries, err)
+			}
+			log.Printf("connect failed: %v, retrying in %s... (attempt %d/%s)",
+				err, backoff, retries, c.retriesLabel())
 			time.Sleep(backoff)
 			backoff = min(backoff*2, maxBackoff)
 			continue
 		}
 
-		// Reset backoff on successful connection
+		// Reset backoff and retry counter on successful connection
 		backoff = time.Second
+		retries = 0
 
 		c.done = make(chan struct{})
 
@@ -165,10 +173,22 @@ func (c *Client) Run() {
 		}
 	drained:
 
-		log.Printf("disconnected, reconnecting in %s...", backoff)
+		retries++
+		if c.config.MaxRetries > 0 && retries >= c.config.MaxRetries {
+			return fmt.Errorf("max retries (%d) exceeded after disconnection", c.config.MaxRetries)
+		}
+		log.Printf("disconnected, reconnecting in %s... (attempt %d/%s)",
+			backoff, retries, c.retriesLabel())
 		time.Sleep(backoff)
 		backoff = min(backoff*2, maxBackoff)
 	}
+}
+
+func (c *Client) retriesLabel() string {
+	if c.config.MaxRetries > 0 {
+		return strconv.Itoa(c.config.MaxRetries)
+	}
+	return "unlimited"
 }
 
 func (c *Client) readLoop() {

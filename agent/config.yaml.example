@@ -6,3 +6,4 @@ relay: wss://your-server.com/ws/agent
 token: your-agent-token
 name: my-machine
 shell: /bin/zsh
+max_retries: 10  # max consecutive reconnect attempts (0 = unlimited)
