@@ -7,7 +7,7 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-lightgrey)]()
 
-Remotely access the terminal on your home Mac from a browser. Run Claude Code, Codex, vim, or any CLI tool and command directly.
+Remotely access the terminal on your home Mac from a browser, no NAT traversal needed. Run Claude Code, Codex, vim, or any CLI tool and command directly.
 
 > ⚠️ **Warning**: This project is for personal use and experimentation only — do NOT deploy it in production environments. You are solely responsible for securing your own data and connections. When exposing the relay to the public internet, always use a reverse proxy with HTTPS (e.g. [Caddy](https://caddyserver.com/)) to encrypt all traffic.
 
