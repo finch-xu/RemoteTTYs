@@ -1,0 +1,49 @@
+# Caddyfile.example — Caddy reverse proxy for RemoteTTYs
+#
+# Replace "rttys.example.com" with your actual domain.
+# Caddy will automatically obtain and renew TLS certificates via Let's Encrypt.
+#
+# Usage:
+#   cp Caddyfile.example Caddyfile
+#   # Edit the domain name below
+#   docker compose -f docker-compose-with-caddy.yml up -d
+
+rttys.example.com {
+	encode gzip zstd
+
+	# Security headers
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), usb=()"
+		-Server
+	}
+
+	# Limit request body size (WebSocket upgrades are exempt)
+	request_body {
+		max_size 1MB
+	}
+
+	reverse_proxy relay:8080 {
+		# Pass real client IP to backend for rate limiting
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+
+		# Disable response buffering for real-time terminal I/O
+		flush_interval -1
+
+		# WebSocket: max session duration (terminal sessions can reconnect)
+		stream_timeout 24h
+
+		# Graceful delay before closing WebSocket on config reload
+		stream_close_delay 5s
+
+		# Upstream connection tuning
+		transport http {
+			keepalive        30s
+			keepalive_interval 15s
+		}
+	}
+}
