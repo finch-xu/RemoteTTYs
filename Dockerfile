@@ -36,7 +36,8 @@ RUN mkdir /app/prod && \
     mkdir -p /app/prod/packages/web /app/prod/packages/relay && \
     cp packages/web/package.json /app/prod/packages/web/ && \
     cp packages/relay/package.json /app/prod/packages/relay/ && \
-    cd /app/prod && npm ci --omit=dev
+    cd /app/prod && npm ci --omit=dev && \
+    mkdir -p /app/prod/packages/relay/node_modules
 
 # ============================================================
 # Stage 2: Runtime
