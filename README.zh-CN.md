@@ -7,7 +7,7 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-lightgrey)]()
 
-在浏览器中远程访问自己家里Mac的终端。直接运行 Claude Code、Codex、vim 等任何 CLI 工具和命令。
+在浏览器中远程访问自己家里Mac的终端，无需 NAT 穿透。直接运行 Claude Code、Codex、vim 等任何 CLI 工具和命令。
 
 > ⚠️ **警告**：本项目仅供个人使用和实验用途，请勿部署到生产环境。使用过程中请自行保障数据和连接的安全。在公网环境下，务必通过 HTTPS 反向代理（如 [Caddy](https://caddyserver.com/)）来加密所有通信流量。
 
