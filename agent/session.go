@@ -43,26 +43,31 @@ func validateShell(shell string) (string, error) {
 	return resolved, nil
 }
 
-// validateCwd checks that a working directory path is safe.
+// validateCwd resolves cwd to a canonical absolute directory path.
+// Rejects null bytes and symlink tricks to prevent path injection from untrusted pty.create messages.
 func validateCwd(cwd string) (string, error) {
 	if cwd == "" {
 		return "", fmt.Errorf("empty cwd")
 	}
-	// Resolve to absolute path
+	if strings.ContainsRune(cwd, 0) {
+		return "", fmt.Errorf("cwd contains null byte")
+	}
 	abs, err := filepath.Abs(cwd)
 	if err != nil {
 		return "", fmt.Errorf("invalid cwd path: %s", cwd)
 	}
-	cleaned := filepath.Clean(abs)
-	// Verify it exists and is a directory
-	info, err := os.Stat(cleaned)
+	resolved, err := filepath.EvalSymlinks(filepath.Clean(abs))
 	if err != nil {
-		return "", fmt.Errorf("cwd does not exist: %s", cleaned)
+		return "", fmt.Errorf("cwd does not exist: %s", cwd)
+	}
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return "", fmt.Errorf("cwd does not exist: %s", resolved)
 	}
 	if !info.IsDir() {
-		return "", fmt.Errorf("cwd is not a directory: %s", cleaned)
+		return "", fmt.Errorf("cwd is not a directory: %s", resolved)
 	}
-	return cleaned, nil
+	return resolved, nil
 }
 
 type Session struct {
