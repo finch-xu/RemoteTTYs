@@ -25,7 +25,7 @@ export function TerminalTabs({ agentId, agentName, existingSessions, send, subsc
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [showNewDialog, setShowNewDialog] = useState(false);
-  const [pendingCreate, setPendingCreate] = useState(false);
+  const [, setPendingCreate] = useState(false);
 
   useEffect(() => {
     if (existingSessions.length > 0) {

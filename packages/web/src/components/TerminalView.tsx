@@ -21,7 +21,7 @@ export function TerminalView({ agentId, sessionId, isExisting, send, subscribe }
   // Update theme on existing terminal when theme changes
   useEffect(() => {
     if (termRef.current) {
-      termRef.current.setTheme(terminalTheme.colors);
+      termRef.current.renderer?.setTheme(terminalTheme.colors);
     }
   }, [terminalTheme]);
 

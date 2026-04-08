@@ -13,7 +13,7 @@ export function useWebSocket(): UseWebSocketReturn {
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const handlersRef = useRef<Map<string, Set<MessageHandler>>>(new Map());
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const intentionalCloseRef = useRef(false);
 
   const connect = useCallback(() => {
