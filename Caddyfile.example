@@ -11,12 +11,19 @@
 rttys.example.com {
 	encode gzip zstd
 
+	# deny robots
+	handle /robots.txt {
+                respond `User-agent: *
+                Disallow: /` 200
+    }
+
 	# Security headers
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), usb=()"
+		X-Robots-Tag "noindex, nofollow, noarchive"
 		-Server
 	}
 
@@ -25,7 +32,7 @@ rttys.example.com {
 		max_size 1MB
 	}
 
-	reverse_proxy relay:8080 {
+	reverse_proxy 172.17.0.1:8080 {
 		# Pass real client IP to backend for rate limiting
 		header_up X-Real-IP {remote_host}
 		header_up X-Forwarded-For {remote_host}
