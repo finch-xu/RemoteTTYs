@@ -15,7 +15,7 @@
 
 > ⚠️ **警告**：本项目仅供个人使用和实验用途，请勿部署到生产环境。使用过程中请自行保障数据和连接的安全。在公网环境下，务必通过 HTTPS 反向代理（如 [Caddy](https://caddyserver.com/)）来加密所有通信流量。
 
-**[English / 英文文档](README.md)** | [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/finch-xu/RemoteTTYs)
+**[English README](README.md)** | [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/finch-xu/RemoteTTYs) | **[English Docs](https://finch-xu.github.io/docs/remotettys/)** | **[中文文档](https://finch-xu.github.io/docs/zh/remotettys/)**
 
 <img src="images/meme.jpg" width="400" />
 

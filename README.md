@@ -15,7 +15,7 @@ Remotely access the terminal on your home Mac from a browser, no NAT traversal n
 
 > ⚠️ **Warning**: This project is for personal use and experimentation only — do NOT deploy it in production environments. You are solely responsible for securing your own data and connections. When exposing the relay to the public internet, always use a reverse proxy with HTTPS (e.g. [Caddy](https://caddyserver.com/)) to encrypt all traffic.
 
-**[Chinese / 中文文档](README.zh-CN.md)** | [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/finch-xu/RemoteTTYs)
+**[中文 README](README.zh-CN.md)** | [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/finch-xu/RemoteTTYs) | **[English Docs](https://finch-xu.github.io/docs/remotettys/)** | **[中文文档](https://finch-xu.github.io/docs/zh/remotettys/)**
 
 <img src="images/meme.jpg" width="400" />
 
