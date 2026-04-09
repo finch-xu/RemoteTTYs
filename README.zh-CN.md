@@ -1,4 +1,8 @@
-# RemoteTTYs
+<p align="center">
+  <img src="images/logo.png" width="300" />
+</p>
+
+<h1 align="center">RemoteTTYs</h1>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](agent/go.mod)
