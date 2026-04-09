@@ -6,3 +6,21 @@ services:
     volumes:
       - ./data:/app/data
     restart: unless-stopped
+
+  remotettys-caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 (QUIC)
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - remotettys
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:
