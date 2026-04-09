@@ -5,4 +5,7 @@ services:
       - "8080:8080"
     volumes:
       - ./data:/app/data
+    env_file:
+      - path: .env
+        required: false
     restart: unless-stopped

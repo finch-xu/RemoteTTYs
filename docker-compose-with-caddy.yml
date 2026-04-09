@@ -1,16 +1,13 @@
 services:
-  relay:
-    build: .
-    expose:
-      - "8080"
+  remotettys:
+    image: ghcr.io/finch-xu/remotettys:latest
+    ports:
+      - "8080:8080"
     volumes:
-      - rttys-data:/app/data
-    env_file:
-      - path: .env
-        required: false
+      - ./data:/app/data
     restart: unless-stopped
 
-  caddy:
+  remotettys-caddy:
     image: caddy:2-alpine
     ports:
       - "80:80"
@@ -21,10 +18,9 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
-      - relay
+      - remotettys
     restart: unless-stopped
 
 volumes:
-  rttys-data:
   caddy-data:
   caddy-config:
