@@ -1,7 +1,7 @@
 # ============================================================
 # Stage 1: Build
 # ============================================================
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 
 # Build dependencies for better-sqlite3 (native addon)
 RUN apk add --no-cache python3 make g++
@@ -42,7 +42,7 @@ RUN mkdir /app/prod && \
 # ============================================================
 # Stage 2: Runtime
 # ============================================================
-FROM node:22-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
@@ -55,18 +55,13 @@ COPY --from=build /app/packages/relay/dist ./packages/relay/dist
 COPY --from=build /app/packages/relay/public ./packages/relay/public
 COPY --from=build /app/packages/relay/package.json ./packages/relay/
 
-# Create non-root user for security
-RUN addgroup -g 1001 -S rttys && adduser -S rttys -u 1001 -G rttys
-
-# Create data directory for SQLite with proper ownership
-RUN mkdir -p /app/data && chown -R rttys:rttys /app/data
+# Create data directory for SQLite
+RUN mkdir -p /app/data
 
 ENV NODE_ENV=production
 ENV PORT=8080
 ENV RTTYS_DB=/app/data/relay.db
 
 EXPOSE 8080
-
-USER rttys
 
 CMD ["node", "packages/relay/dist/index.js"]
