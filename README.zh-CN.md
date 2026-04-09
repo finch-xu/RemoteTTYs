@@ -19,6 +19,15 @@
 
 <img src="images/meme.jpg" width="400" />
 
+## 界面截图
+
+<p>
+  <img src="images/screenshot-terminal.png" width="720" />
+</p>
+<p>
+  <img src="images/screenshot-settings.png" width="720" />
+</p>
+
 ## 工作原理
 
 ```

@@ -19,6 +19,15 @@ Remotely access the terminal on your home Mac from a browser, no NAT traversal n
 
 <img src="images/meme.jpg" width="400" />
 
+## Screenshots
+
+<p>
+  <img src="images/screenshot-terminal.png" width="720" />
+</p>
+<p>
+  <img src="images/screenshot-settings.png" width="720" />
+</p>
+
 ## How It Works
 
 ```
