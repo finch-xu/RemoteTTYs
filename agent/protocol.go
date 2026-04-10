@@ -10,6 +10,8 @@ type IncomingMessage struct {
 	Cwd       string `json:"cwd,omitempty"`
 	Cols      int    `json:"cols,omitempty"`
 	Rows      int    `json:"rows,omitempty"`
+	PublicKey string `json:"publicKey,omitempty"` // ECDH P-256 public key (base64)
+	Hmac      string `json:"hmac,omitempty"`      // HMAC-SHA256 for control messages
 }
 
 // Outgoing messages — each has its own struct for clean JSON marshaling.
@@ -19,6 +21,7 @@ type AgentHelloMsg struct {
 	Name        string `json:"name"`
 	OS          string `json:"os"`
 	Fingerprint string `json:"fingerprint"`
+	IdentityKey string `json:"identityKey"` // Ed25519 public key (base64)
 }
 
 type ServerChallengeMsg struct {
@@ -30,6 +33,14 @@ type PtyCreatedMsg struct {
 	Type      string `json:"type"`
 	SessionID string `json:"sessionId"`
 	PID       int    `json:"pid"`
+	PublicKey string `json:"publicKey"` // ECDH P-256 public key (base64)
+	Signature string `json:"signature"` // Ed25519 signature (base64)
+}
+
+type PtyErrorMsg struct {
+	Type      string `json:"type"`
+	SessionID string `json:"sessionId"`
+	Error     string `json:"error"`
 }
 
 type PtyDataMsg struct {

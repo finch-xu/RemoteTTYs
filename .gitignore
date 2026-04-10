@@ -174,5 +174,6 @@ go.work.sum
 
 .claude/
 mydata/
+docs/
 
 CLAUDE.md

@@ -15,6 +15,7 @@ export interface AgentConnection {
   token: string;
   sessions: Set<string>;
   lastSeen: number;
+  identityKey: string;
 }
 
 export interface PreAuth {
@@ -108,6 +109,7 @@ export function handleAgentConnection(ws: WebSocket, preAuth: PreAuth) {
         token: tokenHash,
         sessions: new Set(),
         lastSeen: Date.now(),
+        identityKey: (msg as AgentHello).identityKey || '',
       };
       agents.set(agentId, conn);
       console.log(`Agent connected: ${hello.name} (${agentId})`);
@@ -145,6 +147,11 @@ export function handleAgentConnection(ws: WebSocket, preAuth: PreAuth) {
 
 export function getAgent(agentId: string): AgentConnection | undefined {
   return agents.get(agentId);
+}
+
+export function getAgentIdentityKey(agentId: string): string {
+  const agent = agents.get(agentId);
+  return agent?.identityKey ?? '';
 }
 
 export function sendToAgent(agentId: string, msg: object) {

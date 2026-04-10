@@ -70,13 +70,19 @@ func runForeground(config *Config) {
 		log.Fatal("FATAL: server_key is required. Get it from the server via GET /api/server-key and add to config.yaml")
 	}
 
+	identity, err := LoadOrCreateIdentity()
+	if err != nil {
+		log.Fatalf("failed to load agent identity: %v", err)
+	}
+	log.Printf("Agent identity fingerprint: %s", identity.Fingerprint())
+
 	log.Printf("rttys-agent starting (name=%s, relay=%s, shell=%s)", config.Name, config.Relay, config.Shell)
 
 	// Write PID file
 	writePIDFile()
 	defer removePIDFile()
 
-	client := NewClient(config)
+	client := NewClient(config, identity)
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -173,6 +179,10 @@ func runStatus() {
 	fmt.Printf("Relay:  %s\n", config.Relay)
 	fmt.Printf("Name:   %s\n", config.Name)
 	fmt.Printf("Shell:  %s\n", config.Shell)
+	identity, err := LoadOrCreateIdentity()
+	if err == nil {
+		fmt.Printf("  Fingerprint: %s\n", identity.Fingerprint())
+	}
 }
 
 func runInit() {

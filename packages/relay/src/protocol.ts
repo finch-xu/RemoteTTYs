@@ -10,6 +10,7 @@ export interface AgentHello extends BaseMessage {
   name: string;
   os: string;
   fingerprint: string;
+  identityKey: string; // Ed25519 public key (base64)
 }
 
 export interface AgentHeartbeat extends BaseMessage {
@@ -20,6 +21,8 @@ export interface PtyCreated extends BaseMessage {
   type: 'pty.created';
   sessionId: string;
   pid: number;
+  publicKey: string;  // ECDH P-256 public key (base64)
+  signature: string;  // Ed25519 signature (base64)
 }
 
 export interface PtyData extends BaseMessage {
@@ -40,7 +43,13 @@ export interface PtyReplay extends BaseMessage {
   payload: string;
 }
 
-export type AgentMessage = AgentHello | AgentHeartbeat | PtyCreated | PtyData | PtyExited | PtyReplay;
+export interface PtyError extends BaseMessage {
+  type: 'pty.error';
+  sessionId: string;
+  error: string;
+}
+
+export type AgentMessage = AgentHello | AgentHeartbeat | PtyCreated | PtyData | PtyExited | PtyReplay | PtyError;
 
 // --- Relay → Agent (auth) ---
 
@@ -56,6 +65,7 @@ export interface PtyCreate extends BaseMessage {
   sessionId: string;
   shell: string;
   cwd: string;
+  publicKey: string; // ECDH P-256 public key (base64)
 }
 
 export interface PtyResize extends BaseMessage {
@@ -63,11 +73,13 @@ export interface PtyResize extends BaseMessage {
   sessionId: string;
   cols: number;
   rows: number;
+  hmac?: string; // HMAC-SHA256 (base64)
 }
 
 export interface PtyClose extends BaseMessage {
   type: 'pty.close';
   sessionId: string;
+  hmac?: string;
 }
 
 export interface PtyReplayRequest extends BaseMessage {
@@ -84,6 +96,7 @@ export interface BrowserPtyCreate extends BaseMessage {
   agentId: string;
   shell: string;
   cwd: string;
+  publicKey: string; // ECDH P-256 public key (base64)
 }
 
 export interface BrowserPtyData extends BaseMessage {
@@ -99,12 +112,14 @@ export interface BrowserPtyResize extends BaseMessage {
   sessionId: string;
   cols: number;
   rows: number;
+  hmac?: string; // HMAC-SHA256 (base64)
 }
 
 export interface BrowserPtyClose extends BaseMessage {
   type: 'pty.close';
   agentId: string;
   sessionId: string;
+  hmac?: string;
 }
 
 export interface BrowserPtyReplayRequest extends BaseMessage {
@@ -122,6 +137,7 @@ export interface RelayAgentOnline extends BaseMessage {
   agentId: string;
   name: string;
   os: string;
+  identityKey: string;
 }
 
 export interface RelayAgentOffline extends BaseMessage {
@@ -133,6 +149,8 @@ export interface RelayPtyCreated extends BaseMessage {
   type: 'pty.created';
   agentId: string;
   sessionId: string;
+  publicKey: string;
+  signature: string;
 }
 
 export interface RelayPtyData extends BaseMessage {
@@ -162,6 +180,13 @@ export interface RelayAgentSessions extends BaseMessage {
   sessions: string[];
 }
 
+export interface RelayPtyError extends BaseMessage {
+  type: 'pty.error';
+  agentId: string;
+  sessionId: string;
+  error: string;
+}
+
 export type RelayToBrowserMessage =
   | RelayAgentOnline
   | RelayAgentOffline
@@ -169,7 +194,8 @@ export type RelayToBrowserMessage =
   | RelayPtyCreated
   | RelayPtyData
   | RelayPtyExited
-  | RelayPtyReplay;
+  | RelayPtyReplay
+  | RelayPtyError;
 
 export function parseMessage(raw: string): BaseMessage {
   const msg = JSON.parse(raw);

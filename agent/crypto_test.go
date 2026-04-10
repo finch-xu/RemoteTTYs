@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/cipher"
 	"testing"
 )
 
@@ -74,19 +75,26 @@ func TestDeriveSessionKeys(t *testing.T) {
 	}
 }
 
+func mustGCM(t *testing.T, key []byte) cipher.AEAD {
+	t.Helper()
+	gcm, err := newGCM(key)
+	if err != nil {
+		t.Fatalf("newGCM: %v", err)
+	}
+	return gcm
+}
+
 func TestEncryptDecryptRoundTrip(t *testing.T) {
 	key := bytes.Repeat([]byte{0x55}, 32)
+	gcm := mustGCM(t, key)
 	plaintext := []byte("hello, remote terminal!")
 
-	ciphertext, err := Encrypt(key, plaintext, DirectionB2A, 0)
-	if err != nil {
-		t.Fatalf("Encrypt: %v", err)
-	}
+	ciphertext := Encrypt(gcm, plaintext, DirectionB2A, 0)
 	if bytes.Equal(ciphertext, plaintext) {
 		t.Fatal("ciphertext equals plaintext")
 	}
 
-	recovered, err := Decrypt(key, ciphertext, DirectionB2A, 0)
+	recovered, err := Decrypt(gcm, ciphertext, DirectionB2A, 0)
 	if err != nil {
 		t.Fatalf("Decrypt: %v", err)
 	}
@@ -96,31 +104,25 @@ func TestEncryptDecryptRoundTrip(t *testing.T) {
 }
 
 func TestDecryptRejectsWrongKey(t *testing.T) {
-	key := bytes.Repeat([]byte{0xAA}, 32)
-	wrongKey := bytes.Repeat([]byte{0xBB}, 32)
+	gcm := mustGCM(t, bytes.Repeat([]byte{0xAA}, 32))
+	wrongGcm := mustGCM(t, bytes.Repeat([]byte{0xBB}, 32))
 	plaintext := []byte("sensitive data")
 
-	ciphertext, err := Encrypt(key, plaintext, DirectionA2B, 1)
-	if err != nil {
-		t.Fatalf("Encrypt: %v", err)
-	}
+	ciphertext := Encrypt(gcm, plaintext, DirectionA2B, 1)
 
-	_, err = Decrypt(wrongKey, ciphertext, DirectionA2B, 1)
+	_, err := Decrypt(wrongGcm, ciphertext, DirectionA2B, 1)
 	if err == nil {
 		t.Fatal("Decrypt with wrong key should fail but succeeded")
 	}
 }
 
 func TestDecryptRejectsWrongCounter(t *testing.T) {
-	key := bytes.Repeat([]byte{0xCC}, 32)
+	gcm := mustGCM(t, bytes.Repeat([]byte{0xCC}, 32))
 	plaintext := []byte("counter test")
 
-	ciphertext, err := Encrypt(key, plaintext, DirectionB2A, 42)
-	if err != nil {
-		t.Fatalf("Encrypt: %v", err)
-	}
+	ciphertext := Encrypt(gcm, plaintext, DirectionB2A, 42)
 
-	_, err = Decrypt(key, ciphertext, DirectionB2A, 99)
+	_, err := Decrypt(gcm, ciphertext, DirectionB2A, 99)
 	if err == nil {
 		t.Fatal("Decrypt with wrong counter should fail but succeeded")
 	}

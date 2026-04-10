@@ -9,6 +9,7 @@ import {
   BrowserPtyClose,
   BrowserPtyReplayRequest,
   PtyReplay,
+  PtyError,
 } from './protocol.js';
 import { getAgent, sendToAgent } from './agentHub.js';
 import { audit } from './db.js';
@@ -63,6 +64,7 @@ export function handleAgentMessage(agentId: string, msg: AgentMessage) {
         agentId,
         name: hello.name,
         os: hello.os,
+        identityKey: hello.identityKey || '',
       });
       break;
     }
@@ -78,6 +80,8 @@ export function handleAgentMessage(agentId: string, msg: AgentMessage) {
         type: 'pty.created',
         agentId,
         sessionId: msg.sessionId,
+        publicKey: msg.publicKey,
+        signature: msg.signature,
       });
       for (const browserId of mapping.browserIds) {
         const browser = getBrowser(browserId);
@@ -123,6 +127,19 @@ export function handleAgentMessage(agentId: string, msg: AgentMessage) {
         agentId,
         sessionId: m.sessionId,
         payload: m.payload,
+      });
+      break;
+    }
+
+    case 'pty.error': {
+      const m = msg as PtyError;
+      const errorMapping = sessions.get(m.sessionId);
+      if (!errorMapping || errorMapping.agentId !== agentId) break;
+      sendToSessionSubscribers(m.sessionId, {
+        type: 'pty.error',
+        agentId,
+        sessionId: m.sessionId,
+        error: m.error,
       });
       break;
     }
@@ -199,6 +216,7 @@ export function handleBrowserMessage(browserId: string, msg: BrowserMessage) {
         sessionId,
         shell,
         cwd,
+        publicKey: m.publicKey,
       });
 
       console.log(`Session ${sessionId} created on agent ${m.agentId} by browser ${browserId}`);
@@ -232,6 +250,7 @@ export function handleBrowserMessage(browserId: string, msg: BrowserMessage) {
         sessionId: m.sessionId,
         cols: Math.max(1, Math.min(m.cols, 500)),
         rows: Math.max(1, Math.min(m.rows, 500)),
+        ...(m.hmac !== undefined && { hmac: m.hmac }),
       });
       break;
     }
@@ -245,6 +264,7 @@ export function handleBrowserMessage(browserId: string, msg: BrowserMessage) {
       sendToAgent(m.agentId, {
         type: 'pty.close',
         sessionId: m.sessionId,
+        ...(m.hmac !== undefined && { hmac: m.hmac }),
       });
       break;
     }

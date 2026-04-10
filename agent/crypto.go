@@ -20,11 +20,13 @@ const (
 	DirectionA2B byte = 0x01 // Agent → Browser
 )
 
-// SessionKeys holds the three 32-byte keys derived from the ECDH shared secret.
+// SessionKeys holds the three 32-byte keys and cached AEAD ciphers.
 type SessionKeys struct {
-	KeyB2A  []byte // 32 bytes — AES-GCM key for Browser→Agent direction
-	KeyA2B  []byte // 32 bytes — AES-GCM key for Agent→Browser direction
-	HMACKey []byte // 32 bytes — HMAC key for control-message signing
+	KeyB2A  []byte      // 32 bytes — AES-GCM key for Browser→Agent direction
+	KeyA2B  []byte      // 32 bytes — AES-GCM key for Agent→Browser direction
+	HMACKey []byte      // 32 bytes — HMAC key for control-message signing
+	GCMB2A  cipher.AEAD // cached AES-GCM cipher for B2A
+	GCMA2B  cipher.AEAD // cached AES-GCM cipher for A2B
 }
 
 // GenerateECDHKeyPair creates an ephemeral P-256 key pair.
@@ -71,11 +73,30 @@ func DeriveSessionKeys(sharedSecret, browserPubRaw, agentPubRaw []byte) (*Sessio
 		return nil, err
 	}
 
+	gcmB2A, err := newGCM(out[0:32])
+	if err != nil {
+		return nil, err
+	}
+	gcmA2B, err := newGCM(out[32:64])
+	if err != nil {
+		return nil, err
+	}
+
 	return &SessionKeys{
 		KeyB2A:  out[0:32],
 		KeyA2B:  out[32:64],
 		HMACKey: out[64:96],
+		GCMB2A:  gcmB2A,
+		GCMA2B:  gcmA2B,
 	}, nil
+}
+
+func newGCM(key []byte) (cipher.AEAD, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	return cipher.NewGCM(block)
 }
 
 // buildNonce constructs the 12-byte AES-GCM nonce:
@@ -89,50 +110,26 @@ func buildNonce(direction byte, counter uint64) []byte {
 	return nonce
 }
 
-// Encrypt encrypts plaintext with AES-256-GCM using a deterministic nonce
-// derived from direction and counter.  Returns nonce || ciphertext || tag.
-func Encrypt(key, plaintext []byte, direction byte, counter uint64) ([]byte, error) {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-
+// Encrypt encrypts plaintext with a cached AES-256-GCM cipher.
+// Returns nonce(12) || ciphertext || tag(16).
+func Encrypt(gcm cipher.AEAD, plaintext []byte, direction byte, counter uint64) []byte {
 	nonce := buildNonce(direction, counter)
-	ciphertextAndTag := gcm.Seal(nil, nonce, plaintext, nil)
-
-	out := make([]byte, 12+len(ciphertextAndTag))
-	copy(out[:12], nonce)
-	copy(out[12:], ciphertextAndTag)
-	return out, nil
+	return gcm.Seal(nonce, nonce, plaintext, nil)
 }
 
-// Decrypt decrypts data produced by Encrypt.  It verifies that the nonce in
-// the data matches the expected nonce built from direction and counter.
-func Decrypt(key, data []byte, direction byte, counter uint64) ([]byte, error) {
+// Decrypt decrypts data produced by Encrypt using a cached AES-256-GCM cipher.
+// Verifies the nonce matches the expected direction+counter.
+func Decrypt(gcm cipher.AEAD, data []byte, direction byte, counter uint64) ([]byte, error) {
 	if len(data) < 12 {
 		return nil, errors.New("crypto: ciphertext too short")
 	}
 
-	nonce := data[:12]
 	expected := buildNonce(direction, counter)
-	if !hmac.Equal(nonce, expected) {
+	if !hmac.Equal(data[:12], expected) {
 		return nil, errors.New("crypto: nonce mismatch")
 	}
 
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-
-	return gcm.Open(nil, nonce, data[12:], nil)
+	return gcm.Open(nil, data[:12], data[12:], nil)
 }
 
 // ComputeHMAC returns HMAC-SHA256(key, data).

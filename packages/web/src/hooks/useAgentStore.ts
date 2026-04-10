@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { apiFetch } from '../lib/api';
+import type { AgentOnline } from '../lib/protocol';
 
 export interface AgentInfo {
   id: string;
@@ -8,6 +9,7 @@ export interface AgentInfo {
   online: boolean;
   sessions: string[];
   lastSeen: string | null;
+  identityKey: string | null;
 }
 
 interface ApiAgent {
@@ -32,14 +34,19 @@ export function useAgentStore(
       const res = await apiFetch('/api/agents');
       if (!res.ok) return;
       const data: ApiAgent[] = await res.json();
-      setAgents(data.map(a => ({
-        id: a.id,
-        name: a.name,
-        os: a.os,
-        online: a.online,
-        sessions: a.sessions,
-        lastSeen: a.lastSeen,
-      })));
+      setAgents(prev => {
+        // Preserve identityKey from previous state (received via WebSocket)
+        const prevMap = new Map(prev.map(a => [a.id, a]));
+        return data.map(a => ({
+          id: a.id,
+          name: a.name,
+          os: a.os,
+          online: a.online,
+          sessions: a.sessions,
+          lastSeen: a.lastSeen,
+          identityKey: prevMap.get(a.id)?.identityKey ?? null,
+        }));
+      });
     } catch {
       // ignore fetch errors
     }
@@ -52,9 +59,17 @@ export function useAgentStore(
     return () => clearInterval(interval);
   }, [fetchAgents]);
 
-  // Re-fetch on WebSocket agent status changes
+  // Re-fetch on WebSocket agent status changes and capture identityKey
   useEffect(() => {
-    const unsubOnline = subscribe('agent.online', () => { fetchAgents(); });
+    const unsubOnline = subscribe('agent.online', (msg: AgentOnline) => {
+      if (msg.identityKey) {
+        // Patch identityKey immediately so it's available before fetchAgents completes
+        setAgents(prev => prev.map(a =>
+          a.id === msg.agentId ? { ...a, identityKey: msg.identityKey } : a
+        ));
+      }
+      fetchAgents();
+    });
     const unsubOffline = subscribe('agent.offline', () => { fetchAgents(); });
     return () => {
       unsubOnline();
