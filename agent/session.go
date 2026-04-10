@@ -75,9 +75,67 @@ type Session struct {
 	PTY        *os.File
 	Cmd        *exec.Cmd
 	Scrollback *RingBuffer
+	Keys        *SessionKeys
+	SendCounter uint64
+	RecvCounter uint64
 }
 
 func (c *Client) handlePtyCreate(msg IncomingMessage) {
+	// --- E2E key exchange ---
+	if msg.PublicKey == "" {
+		c.Send(PtyErrorMsg{
+			Type:      "pty.error",
+			SessionID: msg.SessionID,
+			Error:     "encryption required: missing publicKey",
+		})
+		return
+	}
+
+	browserPubRaw, err := base64.StdEncoding.DecodeString(msg.PublicKey)
+	if err != nil {
+		log.Printf("session %s: invalid browser publicKey base64: %v", msg.SessionID, err)
+		c.Send(PtyErrorMsg{
+			Type:      "pty.error",
+			SessionID: msg.SessionID,
+			Error:     "invalid publicKey encoding",
+		})
+		return
+	}
+
+	browserPub, err := ParseECDHPublicKey(browserPubRaw)
+	if err != nil {
+		log.Printf("session %s: invalid browser ECDH key: %v", msg.SessionID, err)
+		c.Send(PtyErrorMsg{
+			Type:      "pty.error",
+			SessionID: msg.SessionID,
+			Error:     "invalid publicKey",
+		})
+		return
+	}
+
+	agentPriv, agentPub, err := GenerateECDHKeyPair()
+	if err != nil {
+		log.Printf("session %s: ECDH key generation failed: %v", msg.SessionID, err)
+		return
+	}
+	agentPubRaw := agentPub.Bytes()
+
+	sharedSecret, err := ComputeSharedSecret(agentPriv, browserPub)
+	if err != nil {
+		log.Printf("session %s: ECDH shared secret failed: %v", msg.SessionID, err)
+		return
+	}
+
+	keys, err := DeriveSessionKeys(sharedSecret, browserPubRaw, agentPubRaw)
+	if err != nil {
+		log.Printf("session %s: key derivation failed: %v", msg.SessionID, err)
+		return
+	}
+
+	signData := BuildKeyExchangeSignData(agentPubRaw, browserPubRaw, msg.SessionID)
+	signature := c.identity.Sign(signData)
+
+	// --- Shell validation and PTY creation ---
 	shell := c.config.Shell
 	if msg.Shell != "" {
 		shell = msg.Shell
@@ -127,6 +185,7 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 		PTY:        ptmx,
 		Cmd:        cmd,
 		Scrollback: NewRingBuffer(maxScrollbackBytes),
+		Keys:       keys,
 	}
 
 	c.mu.Lock()
@@ -137,9 +196,11 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 		Type:      "pty.created",
 		SessionID: msg.SessionID,
 		PID:       cmd.Process.Pid,
+		PublicKey: base64.StdEncoding.EncodeToString(agentPubRaw),
+		Signature: base64.StdEncoding.EncodeToString(signature),
 	})
 
-	log.Printf("session %s created (pid=%d, shell=%s)", msg.SessionID, cmd.Process.Pid, shell)
+	log.Printf("session %s created (pid=%d, shell=%s, e2e=on)", msg.SessionID, cmd.Process.Pid, shell)
 
 	go c.readPTY(sess)
 }
@@ -150,7 +211,10 @@ func (c *Client) readPTY(s *Session) {
 		n, err := s.PTY.Read(buf)
 		if n > 0 {
 			s.Scrollback.Write(buf[:n])
-			encoded := base64.StdEncoding.EncodeToString(buf[:n])
+
+			encrypted := Encrypt(s.Keys.GCMA2B, buf[:n], DirectionA2B, s.SendCounter)
+			s.SendCounter++
+			encoded := base64.StdEncoding.EncodeToString(encrypted)
 			c.Send(PtyDataMsg{
 				Type:      "pty.data",
 				SessionID: s.ID,
@@ -182,6 +246,7 @@ func (c *Client) readPTY(s *Session) {
 	delete(c.sessions, s.ID)
 	c.mu.Unlock()
 
+	zeroKeys(s.Keys)
 	s.PTY.Close()
 	log.Printf("session %s exited (code=%d)", s.ID, exitCode)
 }
@@ -206,11 +271,18 @@ func (c *Client) handlePtyData(msg IncomingMessage) {
 		return
 	}
 
-	data, err := base64.StdEncoding.DecodeString(msg.Payload)
+	encrypted, err := base64.StdEncoding.DecodeString(msg.Payload)
 	if err != nil {
 		log.Printf("session %s: base64 decode error: %v", msg.SessionID, err)
 		return
 	}
+
+	data, err := Decrypt(sess.Keys.GCMB2A, encrypted, DirectionB2A, sess.RecvCounter)
+	if err != nil {
+		log.Printf("session %s: decrypt error: %v", msg.SessionID, err)
+		return
+	}
+	sess.RecvCounter++
 
 	if _, err := sess.PTY.Write(data); err != nil {
 		log.Printf("session %s: pty write error: %v", msg.SessionID, err)
@@ -220,6 +292,10 @@ func (c *Client) handlePtyData(msg IncomingMessage) {
 func (c *Client) handlePtyResize(msg IncomingMessage) {
 	sess := c.getSession(msg.SessionID)
 	if sess == nil {
+		return
+	}
+
+	if !verifyControlHMAC(sess, msg.Hmac, buildResizeHMACData(msg.SessionID, msg.Cols, msg.Rows), "resize") {
 		return
 	}
 
@@ -248,10 +324,13 @@ func (c *Client) handlePtyReplayRequest(msg IncomingMessage) {
 		return
 	}
 
+	encrypted := Encrypt(sess.Keys.GCMA2B, data, DirectionA2B, sess.SendCounter)
+	sess.SendCounter++
+
 	c.Send(PtyReplayMsg{
 		Type:      "pty.replay",
 		SessionID: sess.ID,
-		Payload:   base64.StdEncoding.EncodeToString(data),
+		Payload:   base64.StdEncoding.EncodeToString(encrypted),
 	})
 }
 
@@ -261,7 +340,43 @@ func (c *Client) handlePtyClose(msg IncomingMessage) {
 		return
 	}
 
+	if !verifyControlHMAC(sess, msg.Hmac, buildCloseHMACData(msg.SessionID), "close") {
+		return
+	}
+
 	if sess.Cmd.Process != nil {
 		sess.Cmd.Process.Signal(syscall.SIGHUP)
+	}
+}
+
+// verifyControlHMAC verifies the HMAC on a control message. Returns true if valid or absent.
+func verifyControlHMAC(sess *Session, hmacField string, hmacData []byte, label string) bool {
+	if hmacField == "" {
+		return true
+	}
+	macBytes, err := base64.StdEncoding.DecodeString(hmacField)
+	if err != nil {
+		log.Printf("session %s: invalid %s HMAC encoding: %v", sess.ID, label, err)
+		return false
+	}
+	if !VerifyHMAC(sess.Keys.HMACKey, hmacData, macBytes) {
+		log.Printf("session %s: %s HMAC verification failed", sess.ID, label)
+		return false
+	}
+	return true
+}
+
+func zeroKeys(keys *SessionKeys) {
+	if keys == nil {
+		return
+	}
+	for i := range keys.KeyB2A {
+		keys.KeyB2A[i] = 0
+	}
+	for i := range keys.KeyA2B {
+		keys.KeyA2B[i] = 0
+	}
+	for i := range keys.HMACKey {
+		keys.HMACKey[i] = 0
 	}
 }

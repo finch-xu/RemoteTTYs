@@ -19,18 +19,19 @@ import (
 )
 
 type Client struct {
-	config      *Config
-	conn        *websocket.Conn
-	mu          sync.Mutex
-	sessions    map[string]*Session
-	sendCh      chan []byte
-	done        chan struct{}
-	wg          sync.WaitGroup
+	config       *Config
+	conn         *websocket.Conn
+	mu           sync.Mutex
+	sessions     map[string]*Session
+	sendCh       chan []byte
+	done         chan struct{}
+	wg           sync.WaitGroup
 	serverPubKey ed25519.PublicKey
-	fingerprint string
+	fingerprint  string
+	identity     *Identity
 }
 
-func NewClient(config *Config) *Client {
+func NewClient(config *Config, identity *Identity) *Client {
 	// Decode server public key once at startup
 	pubKeyBytes, err := base64.StdEncoding.DecodeString(config.ServerKey)
 	if err != nil {
@@ -47,11 +48,12 @@ func NewClient(config *Config) *Client {
 	}
 
 	return &Client{
-		config:      config,
-		sessions:    make(map[string]*Session),
-		sendCh:      make(chan []byte, 256),
+		config:       config,
+		sessions:     make(map[string]*Session),
+		sendCh:       make(chan []byte, 256),
 		serverPubKey: ed25519.PublicKey(pubKeyBytes),
-		fingerprint: fp,
+		fingerprint:  fp,
+		identity:     identity,
 	}
 }
 
@@ -91,6 +93,7 @@ func (c *Client) Connect() error {
 		Name:        c.config.Name,
 		OS:          runtime.GOOS,
 		Fingerprint: c.fingerprint,
+		IdentityKey: c.identity.PublicKeyBase64(),
 	}
 	c.Send(hello)
 

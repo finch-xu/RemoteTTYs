@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { TerminalView } from './TerminalView';
 import { NewTerminalDialog } from './NewTerminalDialog';
 import { useTheme } from '../hooks/useTheme';
 import { MONO_FONT } from '../lib/theme';
+import { generateECDHKeyPair, exportPublicKeyRaw, uint8ToBase64, computeCloseHMAC } from '../lib/e2e';
+import type { E2EKeyPairData } from '../lib/e2e';
 import type { PtyCreated, PtyExited } from '../lib/protocol';
 
 interface SessionInfo {
@@ -15,17 +17,37 @@ interface SessionInfo {
 interface TerminalTabsProps {
   agentId: string;
   agentName: string;
+  identityKey: string | null;
   existingSessions: string[];
   send: (msg: object) => void;
   subscribe: (type: string, handler: (msg: any) => void) => () => void;
 }
 
-export function TerminalTabs({ agentId, agentName, existingSessions, send, subscribe }: TerminalTabsProps) {
+export function TerminalTabs({ agentId, agentName, identityKey, existingSessions, send, subscribe }: TerminalTabsProps) {
   const { ui } = useTheme();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [, setPendingCreate] = useState(false);
+
+  // E2E: queue of pending ECDH key pairs for pty.create requests not yet matched to a sessionId.
+  // When pty.created arrives, the first pending key pair is dequeued and stored per-session.
+  const pendingKeyPairsRef = useRef<E2EKeyPairData[]>([]);
+  // Map sessionId → E2EKeyPairData for sessions with established key pairs
+  const sessionKeyPairsRef = useRef<Map<string, E2EKeyPairData>>(new Map());
+  // Map sessionId → CryptoKey (HMAC key) for close messages
+  const sessionHmacKeysRef = useRef<Map<string, CryptoKey>>(new Map());
+
+  const handleE2EEstablished = useCallback((sid: string, hmacKey: CryptoKey) => {
+    sessionHmacKeysRef.current.set(sid, hmacKey);
+  }, []);
+
+  const createSession = useCallback(async (shell: string, cwd: string) => {
+    const keyPair = await generateECDHKeyPair();
+    const publicKeyRaw = await exportPublicKeyRaw(keyPair.publicKey);
+    pendingKeyPairsRef.current.push({ keyPair, publicKeyRaw });
+    send({ type: 'pty.create', agentId, shell, cwd, publicKey: uint8ToBase64(publicKeyRaw) });
+  }, [agentId, send]);
 
   useEffect(() => {
     if (existingSessions.length > 0) {
@@ -36,13 +58,18 @@ export function TerminalTabs({ agentId, agentName, existingSessions, send, subsc
       setActiveSessionId(existing[0].sessionId);
     } else {
       setPendingCreate(true);
-      send({ type: 'pty.create', agentId, shell: '', cwd: '~' });
+      createSession('', '~');
     }
   }, []);
 
   useEffect(() => {
     const unsub = subscribe('pty.created', (msg: PtyCreated) => {
       if (msg.agentId !== agentId) return;
+      // Associate the pending key pair with this session
+      const pendingKP = pendingKeyPairsRef.current.shift();
+      if (pendingKP) {
+        sessionKeyPairsRef.current.set(msg.sessionId, pendingKP);
+      }
       setSessions(prev => {
         if (prev.some(s => s.sessionId === msg.sessionId)) return prev;
         return [...prev, { sessionId: msg.sessionId, label: `Terminal ${prev.length + 1}`, exited: false, isExisting: false }];
@@ -61,14 +88,24 @@ export function TerminalTabs({ agentId, agentName, existingSessions, send, subsc
     return unsub;
   }, [subscribe, agentId]);
 
-  const handleCloseTab = (sessionId: string) => {
-    const session = sessions.find(s => s.sessionId === sessionId);
+  const handleCloseTab = async (sid: string) => {
+    const session = sessions.find(s => s.sessionId === sid);
     if (session && !session.exited) {
-      send({ type: 'pty.close', agentId, sessionId });
+      const hmacKey = sessionHmacKeysRef.current.get(sid);
+      if (hmacKey) {
+        const hmac = await computeCloseHMAC(hmacKey, sid);
+        send({ type: 'pty.close', agentId, sessionId: sid, hmac });
+      } else {
+        send({ type: 'pty.close', agentId, sessionId: sid });
+      }
     }
-    const remaining = sessions.filter(s => s.sessionId !== sessionId);
+    // Clean up key material
+    sessionKeyPairsRef.current.delete(sid);
+    sessionHmacKeysRef.current.delete(sid);
+
+    const remaining = sessions.filter(s => s.sessionId !== sid);
     setSessions(remaining);
-    if (activeSessionId === sessionId) {
+    if (activeSessionId === sid) {
       setActiveSessionId(remaining.length > 0 ? remaining[0].sessionId : null);
     }
   };
@@ -116,14 +153,14 @@ export function TerminalTabs({ agentId, agentName, existingSessions, send, subsc
       <div style={{ flex: 1, position: 'relative' }}>
         {sessions.map(s => (
           <div key={s.sessionId} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: s.sessionId === activeSessionId ? 'block' : 'none' }}>
-            <TerminalView agentId={agentId} sessionId={s.sessionId} isExisting={s.isExisting} send={send} subscribe={subscribe} />
+            <TerminalView agentId={agentId} sessionId={s.sessionId} isExisting={s.isExisting} identityKey={identityKey} ecdhKeyPair={sessionKeyPairsRef.current.get(s.sessionId) ?? null} send={send} subscribe={subscribe} onE2EEstablished={handleE2EEstablished} />
           </div>
         ))}
       </div>
 
       {showNewDialog && (
         <NewTerminalDialog
-          onSubmit={(shell, cwd) => { send({ type: 'pty.create', agentId, shell, cwd }); setShowNewDialog(false); }}
+          onSubmit={(shell, cwd) => { createSession(shell, cwd); setShowNewDialog(false); }}
           onCancel={() => setShowNewDialog(false)}
         />
       )}

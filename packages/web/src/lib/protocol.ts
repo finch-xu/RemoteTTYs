@@ -10,6 +10,7 @@ export interface AgentOnline extends BaseMessage {
   agentId: string;
   name: string;
   os: string;
+  identityKey: string;
 }
 
 export interface AgentOffline extends BaseMessage {
@@ -21,6 +22,8 @@ export interface PtyCreated extends BaseMessage {
   type: 'pty.created';
   agentId: string;
   sessionId: string;
+  publicKey: string;
+  signature: string;
 }
 
 export interface PtyData extends BaseMessage {
@@ -50,7 +53,14 @@ export interface AgentSessions extends BaseMessage {
   sessions: string[]; // session IDs
 }
 
-export type RelayMessage = AgentOnline | AgentOffline | PtyCreated | PtyData | PtyExited | PtyReplay | AgentSessions;
+export interface PtyError extends BaseMessage {
+  type: 'pty.error';
+  agentId: string;
+  sessionId: string;
+  error: string;
+}
+
+export type RelayMessage = AgentOnline | AgentOffline | PtyCreated | PtyData | PtyExited | PtyReplay | AgentSessions | PtyError;
 
 // Browser → Relay messages
 export interface BrowserPtyCreate extends BaseMessage {
@@ -58,6 +68,7 @@ export interface BrowserPtyCreate extends BaseMessage {
   agentId: string;
   shell: string;
   cwd: string;
+  publicKey: string;
 }
 
 export interface BrowserPtyData extends BaseMessage {
@@ -79,24 +90,4 @@ export interface BrowserPtyClose extends BaseMessage {
   type: 'pty.close';
   agentId: string;
   sessionId: string;
-}
-
-// Base64 helpers — binary-safe via Uint8Array
-export function encodePayload(data: string): string {
-  const bytes = new TextEncoder().encode(data);
-  // Chunk to avoid call stack overflow on large arrays
-  const chunks: string[] = [];
-  for (let i = 0; i < bytes.length; i += 8192) {
-    chunks.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
-  }
-  return btoa(chunks.join(''));
-}
-
-export function decodePayload(payload: string): Uint8Array {
-  const binary = atob(payload);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
 }

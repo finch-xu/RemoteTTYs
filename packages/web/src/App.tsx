@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useAgentStore } from './hooks/useAgentStore';
 import { ThemeContext, useTheme, useThemeProvider } from './hooks/useTheme';
@@ -7,6 +7,9 @@ import { TerminalTabs } from './components/TerminalTabs';
 import { LoginPage } from './components/LoginPage';
 import { SetupPage } from './components/SetupPage';
 import { SettingsPage } from './components/SettingsPage';
+import { FingerprintWarning } from './components/FingerprintWarning';
+import { checkAgentIdentity, acceptNewIdentity } from './lib/knownAgents';
+import type { TOFUResult } from './lib/knownAgents';
 import { UI_FONT } from './lib/theme';
 
 type AppView = 'terminal' | 'settings';
@@ -90,11 +93,60 @@ function ThemedApp({ preferences, onLogout }: { preferences?: Preferences; onLog
   );
 }
 
+interface FingerprintWarningState {
+  agentId: string;
+  agentName: string;
+  identityKey: string;
+  storedFingerprint: string;
+  currentFingerprint: string;
+}
+
 function MainApp({ onLogout }: { onLogout: () => void }) {
   const { ui } = useTheme();
   const { connected, send, subscribe } = useWebSocket();
   const { agents, selectedAgent, selectedAgentId, selectAgent, deleteAgent, fetchAgents } = useAgentStore(subscribe);
   const [view, setView] = useState<AppView>('terminal');
+  const [fingerprintWarning, setFingerprintWarning] = useState<FingerprintWarningState | null>(null);
+  // Track which agent IDs we've already checked to avoid re-checking on every render
+  const checkedAgentsRef = useRef<Set<string>>(new Set());
+
+  // TOFU: check agent identity when agent.online is received with identityKey
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const unsub = subscribe('agent.online', async (msg: any) => {
+      if (!msg.identityKey) return;
+      // Only check once per agentId+identityKey combination
+      const checkKey = `${msg.agentId}:${msg.identityKey}`;
+      if (checkedAgentsRef.current.has(checkKey)) return;
+      checkedAgentsRef.current.add(checkKey);
+
+      const result: TOFUResult = await checkAgentIdentity(msg.agentId, msg.identityKey);
+      if (result.status === 'mismatch') {
+        setFingerprintWarning({
+          agentId: msg.agentId,
+          agentName: msg.name,
+          identityKey: msg.identityKey,
+          storedFingerprint: result.storedFingerprint,
+          currentFingerprint: result.currentFingerprint,
+        });
+      }
+    });
+    return unsub;
+  }, [subscribe]);
+
+  const handleAcceptFingerprint = useCallback(() => {
+    if (!fingerprintWarning) return;
+    acceptNewIdentity(
+      fingerprintWarning.agentId,
+      fingerprintWarning.identityKey,
+      fingerprintWarning.currentFingerprint,
+    );
+    setFingerprintWarning(null);
+  }, [fingerprintWarning]);
+
+  const handleRejectFingerprint = useCallback(() => {
+    setFingerprintWarning(null);
+  }, []);
 
   if (!connected && view !== 'settings') {
     return (
@@ -165,12 +217,22 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
             key={selectedAgent.id}
             agentId={selectedAgent.id}
             agentName={selectedAgent.name}
+            identityKey={selectedAgent.identityKey}
             existingSessions={selectedAgent.sessions}
             send={send}
             subscribe={subscribe}
           />
         )}
       </div>
+      {fingerprintWarning && (
+        <FingerprintWarning
+          agentName={fingerprintWarning.agentName}
+          storedFingerprint={fingerprintWarning.storedFingerprint}
+          currentFingerprint={fingerprintWarning.currentFingerprint}
+          onAccept={handleAcceptFingerprint}
+          onReject={handleRejectFingerprint}
+        />
+      )}
     </div>
   );
 }
