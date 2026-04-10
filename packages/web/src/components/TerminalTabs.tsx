@@ -35,6 +35,8 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
   const pendingKeyPairsRef = useRef<E2EKeyPairData[]>([]);
   // Map sessionId → E2EKeyPairData for sessions with established key pairs
   const sessionKeyPairsRef = useRef<Map<string, E2EKeyPairData>>(new Map());
+  // Map sessionId → agent's key exchange response (publicKey + signature from pty.created)
+  const agentKeyExchangeRef = useRef<Map<string, { publicKey: string; signature: string }>>(new Map());
   // Map sessionId → CryptoKey (HMAC key) for close messages
   const sessionHmacKeysRef = useRef<Map<string, CryptoKey>>(new Map());
 
@@ -70,6 +72,10 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
       if (pendingKP) {
         sessionKeyPairsRef.current.set(msg.sessionId, pendingKP);
       }
+      // Store agent's key exchange response so TerminalView can perform E2E inline
+      if (msg.publicKey && msg.signature) {
+        agentKeyExchangeRef.current.set(msg.sessionId, { publicKey: msg.publicKey, signature: msg.signature });
+      }
       setSessions(prev => {
         if (prev.some(s => s.sessionId === msg.sessionId)) return prev;
         return [...prev, { sessionId: msg.sessionId, label: `Terminal ${prev.length + 1}`, exited: false, isExisting: false }];
@@ -101,6 +107,7 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
     }
     // Clean up key material
     sessionKeyPairsRef.current.delete(sid);
+    agentKeyExchangeRef.current.delete(sid);
     sessionHmacKeysRef.current.delete(sid);
 
     const remaining = sessions.filter(s => s.sessionId !== sid);
@@ -153,7 +160,7 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
       <div style={{ flex: 1, position: 'relative' }}>
         {sessions.map(s => (
           <div key={s.sessionId} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: s.sessionId === activeSessionId ? 'block' : 'none' }}>
-            <TerminalView agentId={agentId} sessionId={s.sessionId} isExisting={s.isExisting} identityKey={identityKey} ecdhKeyPair={sessionKeyPairsRef.current.get(s.sessionId) ?? null} send={send} subscribe={subscribe} onE2EEstablished={handleE2EEstablished} />
+            <TerminalView agentId={agentId} sessionId={s.sessionId} isExisting={s.isExisting} identityKey={identityKey} ecdhKeyPair={sessionKeyPairsRef.current.get(s.sessionId) ?? null} agentPublicKey={agentKeyExchangeRef.current.get(s.sessionId)?.publicKey ?? null} agentSignature={agentKeyExchangeRef.current.get(s.sessionId)?.signature ?? null} send={send} subscribe={subscribe} onE2EEstablished={handleE2EEstablished} />
           </div>
         ))}
       </div>

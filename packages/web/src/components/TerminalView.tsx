@@ -14,7 +14,7 @@ import {
   DIRECTION_A2B,
 } from '../lib/e2e';
 import type { E2ESession, E2EKeyPairData } from '../lib/e2e';
-import type { PtyCreated, PtyData, PtyExited, PtyReplay, PtyError } from '../lib/protocol';
+import type { PtyData, PtyExited, PtyReplay, PtyError } from '../lib/protocol';
 
 interface TerminalViewProps {
   agentId: string;
@@ -22,12 +22,14 @@ interface TerminalViewProps {
   isExisting?: boolean;
   identityKey: string | null;
   ecdhKeyPair: E2EKeyPairData | null;
+  agentPublicKey: string | null;
+  agentSignature: string | null;
   send: (msg: object) => void;
   subscribe: (type: string, handler: (msg: any) => void) => () => void;
   onE2EEstablished?: (sessionId: string, hmacKey: CryptoKey) => void;
 }
 
-export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdhKeyPair, send, subscribe, onE2EEstablished }: TerminalViewProps) {
+export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdhKeyPair, agentPublicKey, agentSignature, send, subscribe, onE2EEstablished }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const e2eRef = useRef<E2ESession | null>(null);
@@ -120,33 +122,28 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
       // Send initial resize
       sendResize(term.cols, term.rows);
 
-      // --- Key exchange: handle pty.created ---
-      if (!isExisting && ecdhKeyPair && identityKey) {
-        cleanups.push(subscribe('pty.created', async (msg: PtyCreated) => {
-          if (msg.sessionId !== sessionId) return;
-          if (!msg.publicKey || !msg.signature) return;
+      // --- E2E key exchange (inline using props, not via pty.created subscription) ---
+      // pty.created is processed by TerminalTabs before TerminalView mounts,
+      // so subscribing to it here would be too late. Instead, the agent's
+      // publicKey and signature are passed as props.
+      if (!isExisting && ecdhKeyPair && identityKey && agentPublicKey && agentSignature) {
+        try {
+          const agentPubRaw = base64ToUint8(agentPublicKey);
+          const signatureRaw = base64ToUint8(agentSignature);
+          const identityKeyRaw = base64ToUint8(identityKey);
 
-          try {
-            const agentPubRaw = base64ToUint8(msg.publicKey);
-            const signatureRaw = base64ToUint8(msg.signature);
-            const identityKeyRaw = base64ToUint8(identityKey);
+          const valid = await verifyKeyExchangeSignature(
+            identityKeyRaw,
+            agentPubRaw,
+            ecdhKeyPair.publicKeyRaw,
+            sessionId,
+            signatureRaw,
+          );
 
-            // Verify Ed25519 signature
-            const valid = await verifyKeyExchangeSignature(
-              identityKeyRaw,
-              agentPubRaw,
-              ecdhKeyPair.publicKeyRaw,
-              sessionId,
-              signatureRaw,
-            );
-
-            if (!valid) {
-              console.error('[E2E] Key exchange signature verification failed for session', sessionId);
-              term.write('\r\n\x1b[91m[E2E] Key exchange signature verification failed. Session may be compromised.]\x1b[0m\r\n');
-              return;
-            }
-
-            // Import agent's public key and derive session keys
+          if (!valid) {
+            console.error('[E2E] Key exchange signature verification failed for session', sessionId);
+            term.write('\r\n\x1b[91m[E2E] Key exchange signature verification failed. Session may be compromised.]\x1b[0m\r\n');
+          } else {
             const agentPubKey = await importPublicKeyRaw(agentPubRaw);
             const keys = await deriveSessionKeys(
               ecdhKeyPair.keyPair.privateKey,
@@ -161,15 +158,13 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
               recvCounter: 0,
             };
 
-            // Notify parent so it can use hmacKey for close messages
             onE2EEstablished?.(sessionId, keys.hmacKey);
-
             console.log('[E2E] Session keys established for', sessionId);
-          } catch (err) {
-            console.error('[E2E] Key exchange failed:', err);
-            term.write('\r\n\x1b[91m[E2E] Key exchange failed. Terminal may not work correctly.]\x1b[0m\r\n');
           }
-        }));
+        } catch (err) {
+          console.error('[E2E] Key exchange failed:', err);
+          term.write('\r\n\x1b[91m[E2E] Key exchange failed. Terminal may not work correctly.]\x1b[0m\r\n');
+        }
       }
 
       // --- Input handling ---
@@ -276,7 +271,7 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
       e2eRef.current = null;
       for (const fn of cleanups) fn();
     };
-  }, [agentId, sessionId, send, subscribe]);
+  }, [agentId, sessionId, agentPublicKey, agentSignature, send, subscribe]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%', overflow: 'hidden', background: terminalTheme.colors.background }} />;
 }
