@@ -19,6 +19,7 @@ interface ApiAgent {
   online: boolean;
   sessions: string[];
   fingerprint: string | null;
+  identityKey: string | null;
   lastSeen: string | null;
   createdAt: string;
 }
@@ -35,7 +36,6 @@ export function useAgentStore(
       if (!res.ok) return;
       const data: ApiAgent[] = await res.json();
       setAgents(prev => {
-        // Preserve identityKey from previous state (received via WebSocket)
         const prevMap = new Map(prev.map(a => [a.id, a]));
         return data.map(a => ({
           id: a.id,
@@ -44,7 +44,9 @@ export function useAgentStore(
           online: a.online,
           sessions: a.sessions,
           lastSeen: a.lastSeen,
-          identityKey: prevMap.get(a.id)?.identityKey ?? null,
+          // Use identityKey from API (available for online agents), fall back to
+          // WebSocket-delivered value, then null
+          identityKey: a.identityKey || prevMap.get(a.id)?.identityKey || null,
         }));
       });
     } catch {

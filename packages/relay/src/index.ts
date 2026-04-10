@@ -309,8 +309,10 @@ app.get('/api/agents', standardLimiter, requireAuth, (_req, res) => {
   const dbAgents = listAgentsFromDB();
   const onlineAgents = getAllAgents();
   const sessionMap = new Map<string, string[]>();
+  const identityKeyMap = new Map<string, string>();
   for (const a of onlineAgents) {
     sessionMap.set(a.id, Array.from(a.sessions));
+    if (a.identityKey) identityKeyMap.set(a.id, a.identityKey);
   }
   const agents = dbAgents.map((a) => ({
     id: a.id,
@@ -319,6 +321,7 @@ app.get('/api/agents', standardLimiter, requireAuth, (_req, res) => {
     online: !!a.online,
     sessions: sessionMap.get(a.id) ?? [],
     fingerprint: a.fingerprint,
+    identityKey: identityKeyMap.get(a.id) ?? null,
     lastSeen: a.last_seen,
     createdAt: a.created_at,
   }));
