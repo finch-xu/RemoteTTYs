@@ -212,16 +212,19 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
               </button>
             </div>
           </div>
-        ) : (
-          <TerminalTabs
-            key={selectedAgent.id}
-            agentId={selectedAgent.id}
-            agentName={selectedAgent.name}
-            identityKey={selectedAgent.identityKey}
-            existingSessions={selectedAgent.sessions}
-            send={send}
-            subscribe={subscribe}
-          />
+        ) : null}
+        {selectedAgent && (
+          <div style={{ flex: 1, display: view === 'terminal' && selectedAgent.online ? 'flex' : 'none', flexDirection: 'column' }}>
+            <TerminalTabs
+              key={selectedAgent.id}
+              agentId={selectedAgent.id}
+              agentName={selectedAgent.name}
+              identityKey={selectedAgent.identityKey}
+              existingSessions={selectedAgent.sessions}
+              send={send}
+              subscribe={subscribe}
+            />
+          </div>
         )}
       </div>
       {fingerprintWarning && (
