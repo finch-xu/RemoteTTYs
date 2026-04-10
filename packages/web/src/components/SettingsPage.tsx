@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { CreateTokenDialog } from './CreateTokenDialog';
 import { apiFetch } from '../lib/api';
 import { useTheme } from '../hooks/useTheme';
-import { UI_FONT, MONO_FONT, terminalThemes } from '../lib/theme';
+import { UI_FONT, MONO_FONT, terminalThemes, FONT_FAMILIES } from '../lib/theme';
+import { DEFAULT_FONT_SIZE } from '../hooks/useTheme';
 
 interface TokenInfo {
   id: number;
@@ -23,8 +24,8 @@ interface AgentInfo {
   lastSeen: string | null;
 }
 
-export function SettingsPage() {
-  const { ui, terminalThemeName, setTerminalThemeName } = useTheme();
+export function SettingsPage({ onAgentDeleted }: { onAgentDeleted?: () => void }) {
+  const { ui, terminalThemeName, setTerminalThemeName, fontSize, setFontSize, fontFamily, setFontFamily } = useTheme();
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [serverKey, setServerKey] = useState('');
@@ -86,6 +87,13 @@ export function SettingsPage() {
     fetchAgents();
   };
 
+  const handleDeleteAgent = async (agentId: string, agentName: string) => {
+    if (!confirm(`Delete agent "${agentName}"? This will remove it from the registered list.`)) return;
+    await apiFetch(`/api/agents/${agentId}`, { method: 'DELETE' });
+    fetchAgents();
+    onAgentDeleted?.();
+  };
+
   return (
     <div style={{ flex: 1, padding: 28, overflow: 'auto', fontFamily: UI_FONT }}>
       {/* Terminal Theme Section */}
@@ -119,6 +127,68 @@ export function SettingsPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Terminal Font Section */}
+      <div style={{ marginBottom: 32 }}>
+        <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: ui.textPrimary }}>Terminal Font</h2>
+        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          {/* Font Size */}
+          <div style={{ minWidth: 200 }}>
+            <label style={{ fontSize: 13, color: ui.textSecondary, display: 'block', marginBottom: 8 }}>
+              Font Size: {fontSize}px
+            </label>
+            <input
+              type="range"
+              min={10}
+              max={24}
+              step={1}
+              value={fontSize}
+              onChange={(e) => setFontSize(Number(e.target.value))}
+              style={{ width: '100%', accentColor: ui.accent }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: ui.textMuted, marginTop: 2 }}>
+              <span>10</span>
+              <span>24</span>
+            </div>
+          </div>
+          {/* Font Family */}
+          <div style={{ minWidth: 240 }}>
+            <label style={{ fontSize: 13, color: ui.textSecondary, display: 'block', marginBottom: 8 }}>Font Family</label>
+            <select
+              value={fontFamily}
+              onChange={(e) => setFontFamily(e.target.value)}
+              style={{
+                width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13,
+                border: `1px solid ${ui.border}`, background: ui.surface, color: ui.textPrimary,
+                fontFamily: 'inherit', cursor: 'pointer', outline: 'none',
+              }}
+            >
+              {FONT_FAMILIES.map(f => (
+                <option key={f.value} value={f.value}>{f.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {/* Preview */}
+        <div style={{
+          marginTop: 12, padding: '10px 14px', borderRadius: 8,
+          background: ui.surfaceAlt, fontFamily: fontFamily, fontSize: fontSize,
+          color: ui.textPrimary, lineHeight: 1.4,
+        }}>
+          ABCDEfghij 01234 ~!@#$%
+        </div>
+        {fontSize !== DEFAULT_FONT_SIZE || fontFamily !== MONO_FONT ? (
+          <button
+            onClick={() => { setFontSize(DEFAULT_FONT_SIZE); setFontFamily(MONO_FONT); }}
+            style={{
+              marginTop: 8, background: 'none', border: `1px solid ${ui.border}`, borderRadius: 6,
+              padding: '4px 12px', fontSize: 12, cursor: 'pointer', color: ui.textSecondary, fontFamily: 'inherit',
+            }}
+          >
+            Reset to Default
+          </button>
+        ) : null}
       </div>
 
       {/* Agent Tokens Section */}
@@ -240,6 +310,14 @@ export function SettingsPage() {
                     Last seen: {new Date(a.lastSeen + 'Z').toLocaleString()}
                   </div>
                 )}
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    style={{ background: 'none', border: `1px solid ${ui.border}`, borderRadius: 6, padding: '3px 12px', fontSize: 11, cursor: 'pointer', color: ui.error, fontFamily: 'inherit' }}
+                    onClick={() => handleDeleteAgent(a.id, a.name)}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>

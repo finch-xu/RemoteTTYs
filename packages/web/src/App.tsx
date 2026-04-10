@@ -15,6 +15,8 @@ type AuthState = 'loading' | 'authenticated' | 'unauthenticated';
 interface Preferences {
   uiTheme?: string;
   terminalTheme?: string;
+  fontSize?: number;
+  fontFamily?: string;
 }
 
 function App() {
@@ -91,7 +93,7 @@ function ThemedApp({ preferences, onLogout }: { preferences?: Preferences; onLog
 function MainApp({ onLogout }: { onLogout: () => void }) {
   const { ui } = useTheme();
   const { connected, send, subscribe } = useWebSocket();
-  const { agents, selectedAgent, selectedAgentId, selectAgent } = useAgentStore(subscribe);
+  const { agents, selectedAgent, selectedAgentId, selectAgent, deleteAgent, fetchAgents } = useAgentStore(subscribe);
   const [view, setView] = useState<AppView>('terminal');
 
   if (!connected && view !== 'settings') {
@@ -114,14 +116,49 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {view === 'settings' ? (
-          <SettingsPage />
+          <SettingsPage onAgentDeleted={fetchAgents} />
+        ) : agents.length === 0 ? (
+          <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary, flexDirection: 'column', gap: 16 }}>
+            <div style={{ fontSize: 32, color: ui.textMuted }}>&#x1F5A5;</div>
+            <div>No agents registered</div>
+            <div style={{ fontSize: 13, color: ui.textSecondary, maxWidth: 320, textAlign: 'center', lineHeight: 1.5 }}>
+              Create a token in Settings to connect your first agent.
+            </div>
+            <button
+              onClick={() => setView('settings')}
+              style={{ marginTop: 8, padding: '8px 20px', borderRadius: 6, border: 'none', background: ui.textPrimary, color: ui.bg, fontSize: 13, fontFamily: UI_FONT, cursor: 'pointer', fontWeight: 500 }}
+            >
+              Go to Settings
+            </button>
+          </div>
         ) : !selectedAgent ? (
           <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary }}>
             <span style={{ color: ui.warning, fontSize: 20 }}>{'\u25cf'}</span> Waiting for agent to connect...
           </div>
         ) : !selectedAgent.online ? (
-          <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary }}>
-            <span style={{ color: ui.textMuted, fontSize: 20 }}>{'\u25cf'}</span> {selectedAgent.name} is offline
+          <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary, flexDirection: 'column', gap: 12 }}>
+            <span style={{ color: ui.textMuted, fontSize: 32 }}>{'\u25cf'}</span>
+            <div style={{ fontSize: 16, fontWeight: 500 }}>{selectedAgent.name}</div>
+            <div style={{ fontSize: 13, color: ui.textSecondary }}>
+              This agent is offline
+              {selectedAgent.lastSeen && (
+                <span> &middot; Last seen {new Date(selectedAgent.lastSeen).toLocaleString()}</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button
+                onClick={() => deleteAgent(selectedAgent.id)}
+                style={{ padding: '6px 16px', borderRadius: 6, border: `1px solid ${ui.border}`, background: 'transparent', color: ui.error, fontSize: 13, fontFamily: UI_FONT, cursor: 'pointer' }}
+              >
+                Delete Agent
+              </button>
+              <button
+                onClick={() => setView('settings')}
+                style={{ padding: '6px 16px', borderRadius: 6, border: `1px solid ${ui.border}`, background: 'transparent', color: ui.textSecondary, fontSize: 13, fontFamily: UI_FONT, cursor: 'pointer' }}
+              >
+                Go to Settings
+              </button>
+            </div>
           </div>
         ) : (
           <TerminalTabs

@@ -52,8 +52,8 @@ export function Sidebar({ agents, selectedAgentId, onSelectAgent, currentView, o
       </div>
       <div style={{ flex: 1, overflow: 'auto' }}>
         {agents.length === 0 && (
-          <div style={{ color: ui.textMuted, fontSize: 13, padding: '8px 14px' }}>
-            No agents connected
+          <div style={{ color: ui.textMuted, fontSize: 12, padding: '8px 14px' }}>
+            No agents
           </div>
         )}
         {agents.map(agent => (

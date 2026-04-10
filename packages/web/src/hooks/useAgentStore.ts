@@ -7,6 +7,7 @@ export interface AgentInfo {
   os: string;
   online: boolean;
   sessions: string[];
+  lastSeen: string | null;
 }
 
 interface ApiAgent {
@@ -37,6 +38,7 @@ export function useAgentStore(
         os: a.os,
         online: a.online,
         sessions: a.sessions,
+        lastSeen: a.lastSeen,
       })));
     } catch {
       // ignore fetch errors
@@ -73,6 +75,21 @@ export function useAgentStore(
     setSelectedAgentId(agentId);
   }, []);
 
+  const deleteAgent = useCallback(async (agentId: string) => {
+    try {
+      const res = await apiFetch(`/api/agents/${agentId}`, { method: 'DELETE' });
+      if (!res.ok) return;
+      if (selectedAgentId === agentId) {
+        const remaining = agents.filter(a => a.id !== agentId);
+        const nextOnline = remaining.find(a => a.online);
+        setSelectedAgentId(nextOnline?.id ?? remaining[0]?.id ?? null);
+      }
+      await fetchAgents();
+    } catch {
+      // ignore
+    }
+  }, [selectedAgentId, agents, fetchAgents]);
+
   const agentsMap = useMemo(() => new Map(agents.map(a => [a.id, a])), [agents]);
   const selectedAgent = useMemo(
     () => (selectedAgentId ? agentsMap.get(selectedAgentId) ?? null : null),
@@ -84,5 +101,7 @@ export function useAgentStore(
     selectedAgent,
     selectedAgentId,
     selectAgent,
+    deleteAgent,
+    fetchAgents,
   };
 }
