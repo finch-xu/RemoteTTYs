@@ -51,7 +51,9 @@
 - 浏览器重连时自动回放 scrollback（每会话 1MB 缓冲区）
 - 多用户认证（JWT httpOnly cookie + CSRF 防护）
 - Agent token 管理，授权机器接入
+- 端到端加密（ECDH P-256 + AES-256-GCM）— Relay 无法读取终端内容
 - Ed25519 challenge-response 服务端身份验证
+- Agent 身份密钥 + TOFU 信任模型（类似 SSH）防中间人攻击
 - 机器指纹绑定，防止 token 跨机器使用
 - 审计日志（登录、连接、会话生命周期）
 - 单文件 Go 二进制 Agent — 目标机器零依赖
@@ -148,11 +150,25 @@ Agent 自动重连，指数退避（1s 到 30s 上限）。
 
 ## 安全模型
 
+### 传输安全
+
 Agent 到服务端的连接受三层保护：
 
 1. **HTTP 层 Token 认证** — Agent 在 WebSocket 升级时通过 `X-Token` HTTP header 发送 token。无效 token 在 WebSocket 连接建立前即被拒绝。
 2. **Ed25519 challenge-response** — WebSocket 建立后，服务端用 Ed25519 私钥签名 agent 的 token 作为 challenge 发送。Agent 用预配置的服务端公钥验证签名，验证通过后才发送数据。
 3. **机器指纹绑定** — Agent 上报机器唯一标识的 SHA-256 哈希。服务端在首次连接时记录，后续连接若不匹配则拒绝，防止 token 被复制到其他机器使用。
+
+### 端到端加密
+
+所有终端内容（按键输入和命令输出）在浏览器和 Agent 之间端到端加密。Relay 服务端无法读取或篡改终端数据 — 仅转发加密后的 payload。
+
+- **密钥交换**：每个会话使用 ECDH P-256 临时密钥对，提供前向保密
+- **对称加密**：AES-256-GCM，基于计数器的 nonce 防重放攻击
+- **密钥派生**：HKDF-SHA256，浏览器→Agent 和 Agent→浏览器使用独立密钥
+- **中间人防护**：每个 Agent 拥有 Ed25519 身份密钥，浏览器首次连接时自动信任（TOFU，类似 SSH）。若身份密钥变更，浏览器会弹出安全警告
+- **控制消息完整性**：`pty.resize` 和 `pty.close` 消息使用 HMAC-SHA256 认证
+
+可在 Agent 机器上运行 `rttys-agent status` 查看指纹，与浏览器显示的进行比对验证。
 
 ## 管理 API
 

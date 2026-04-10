@@ -51,7 +51,9 @@ Local Machine(s)              Remote Server                Browser(s)
 - Scrollback replay on browser reconnect (1MB buffer per session)
 - Multi-user authentication with JWT (httpOnly cookie + CSRF protection)
 - Agent token management for machine authorization
+- End-to-end encryption (ECDH P-256 + AES-256-GCM) — relay cannot read terminal content
 - Ed25519 challenge-response for server identity verification
+- Agent identity keys with TOFU (SSH-like trust model) for MITM protection
 - Machine fingerprint binding to prevent token reuse across machines
 - Audit logging (login, connections, session lifecycle)
 - Single Go binary agent — zero dependencies on target machines
@@ -148,11 +150,25 @@ The agent reconnects automatically with exponential backoff (1s to 30s cap).
 
 ## Security Model
 
+### Transport Security
+
 The agent-to-server connection is protected by three layers:
 
 1. **Token authentication at HTTP layer** — the agent sends its token in the `X-Token` HTTP header during WebSocket upgrade. Invalid tokens are rejected before the WebSocket connection is established.
 2. **Ed25519 challenge-response** — after the WebSocket is established, the server signs the agent's token with its Ed25519 private key and sends it as a challenge. The agent verifies the signature using the pre-configured server public key. Data is only sent after verification passes.
 3. **Machine fingerprint binding** — the agent reports a SHA-256 hash of the machine's unique ID. The server records it on first connection and rejects mismatches on subsequent connections, preventing token reuse on different machines.
+
+### End-to-End Encryption
+
+All terminal content (keystrokes and output) is end-to-end encrypted between the browser and the agent. The relay server cannot read or modify terminal data — it only forwards encrypted payloads.
+
+- **Key exchange**: ECDH P-256 ephemeral key pair per session, providing forward secrecy
+- **Symmetric encryption**: AES-256-GCM with counter-based nonces for replay protection
+- **Key derivation**: HKDF-SHA256 with directional keys (browser→agent and agent→browser use separate keys)
+- **MITM protection**: Each agent has an Ed25519 identity key. The browser stores it on first connection (Trust On First Use, like SSH). If the key changes, a warning dialog is shown.
+- **Control message integrity**: `pty.resize` and `pty.close` messages are authenticated with HMAC-SHA256
+
+Verify an agent's fingerprint by running `rttys-agent status` on the agent machine and comparing with what the browser shows.
 
 ## Management API
 
