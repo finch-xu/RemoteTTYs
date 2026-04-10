@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "ghostty-web": "^0.4.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
