@@ -2,7 +2,6 @@ import { useRef, useEffect } from 'react';
 import { init, Terminal, FitAddon } from 'ghostty-web';
 import { encodePayload, decodePayload } from '../lib/protocol';
 import { useTheme } from '../hooks/useTheme';
-import { MONO_FONT } from '../lib/theme';
 import type { PtyData, PtyExited, PtyReplay } from '../lib/protocol';
 
 interface TerminalViewProps {
@@ -16,14 +15,23 @@ interface TerminalViewProps {
 export function TerminalView({ agentId, sessionId, isExisting, send, subscribe }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
-  const { terminalTheme } = useTheme();
+  const { terminalTheme, fontSize, fontFamily } = useTheme();
 
-  // Update theme on existing terminal when theme changes
+  // Update theme/font on existing terminal when settings change
   useEffect(() => {
     if (termRef.current) {
       termRef.current.renderer?.setTheme(terminalTheme.colors);
     }
   }, [terminalTheme]);
+
+  useEffect(() => {
+    if (!termRef.current) return;
+    // Wait for web fonts to load before updating renderer metrics
+    document.fonts.ready.then(() => {
+      termRef.current?.renderer?.setFontSize(fontSize);
+      termRef.current?.renderer?.setFontFamily(fontFamily);
+    });
+  }, [fontSize, fontFamily]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -38,8 +46,8 @@ export function TerminalView({ agentId, sessionId, isExisting, send, subscribe }
 
       const term = new Terminal({
         cursorBlink: true,
-        fontSize: 14,
-        fontFamily: MONO_FONT,
+        fontSize,
+        fontFamily,
         theme: terminalTheme.colors,
       });
       termRef.current = term;
@@ -50,6 +58,38 @@ export function TerminalView({ agentId, sessionId, isExisting, send, subscribe }
       fitAddon.fit();
 
       send({ type: 'pty.resize', agentId, sessionId, cols: term.cols, rows: term.rows });
+
+      // Fix: Shift+Tab should send backtab sequence \x1b[Z, not \t
+      // ghostty-web treats SHIFT+TAB the same as TAB in its InputHandler
+      term.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+        if (event.key === 'Tab' && event.shiftKey && event.type === 'keydown') {
+          send({ type: 'pty.data', agentId, sessionId, payload: encodePayload('\x1b[Z') });
+          return true;
+        }
+        return false;
+      });
+
+      // Fix: Forward mouse wheel events as SGR mouse protocol when TUI apps
+      // enable mouse tracking (e.g. Claude Code, vim). ghostty-web defaults to
+      // sending arrow keys in alternate screen, which doesn't work for apps
+      // that use mouse-based scrolling.
+      term.attachCustomWheelEventHandler((event: WheelEvent) => {
+        if (!term.hasMouseTracking()) return false;
+
+        const canvas = containerRef.current?.querySelector('canvas');
+        if (!canvas) return false;
+
+        const rect = canvas.getBoundingClientRect();
+        const charW = term.renderer?.charWidth ?? 8;
+        const charH = term.renderer?.charHeight ?? 16;
+        const x = Math.max(1, Math.floor((event.clientX - rect.left) / charW) + 1);
+        const y = Math.max(1, Math.floor((event.clientY - rect.top) / charH) + 1);
+        const button = event.deltaY > 0 ? 65 : 64; // wheel down : wheel up
+
+        const seq = `\x1b[<${button};${x};${y}M`;
+        send({ type: 'pty.data', agentId, sessionId, payload: encodePayload(seq) });
+        return true;
+      });
 
       const inputDisposable = term.onData((data: string) => {
         send({ type: 'pty.data', agentId, sessionId, payload: encodePayload(data) });

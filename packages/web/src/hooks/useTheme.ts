@@ -1,7 +1,9 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { lightTheme, darkTheme, getTerminalTheme, DEFAULT_TERMINAL_THEME } from '../lib/theme';
+import { lightTheme, darkTheme, getTerminalTheme, DEFAULT_TERMINAL_THEME, MONO_FONT } from '../lib/theme';
 import type { UITheme, UIThemeMode, TerminalTheme } from '../lib/theme';
 import { apiFetch } from '../lib/api';
+
+export const DEFAULT_FONT_SIZE = 14;
 
 interface ThemeContextValue {
   ui: UITheme;
@@ -10,6 +12,10 @@ interface ThemeContextValue {
   terminalTheme: TerminalTheme;
   terminalThemeName: string;
   setTerminalThemeName: (name: string) => void;
+  fontSize: number;
+  setFontSize: (size: number) => void;
+  fontFamily: string;
+  setFontFamily: (family: string) => void;
 }
 
 export const ThemeContext = createContext<ThemeContextValue>({
@@ -19,6 +25,10 @@ export const ThemeContext = createContext<ThemeContextValue>({
   terminalTheme: getTerminalTheme(DEFAULT_TERMINAL_THEME),
   terminalThemeName: DEFAULT_TERMINAL_THEME,
   setTerminalThemeName: () => {},
+  fontSize: DEFAULT_FONT_SIZE,
+  setFontSize: () => {},
+  fontFamily: MONO_FONT,
+  setFontFamily: () => {},
 });
 
 export function useTheme() {
@@ -35,6 +45,8 @@ function resolveSystemTheme(): 'light' | 'dark' {
 interface Preferences {
   uiTheme?: string;
   terminalTheme?: string;
+  fontSize?: number;
+  fontFamily?: string;
 }
 
 export function useThemeProvider(initialPreferences?: Preferences) {
@@ -43,6 +55,12 @@ export function useThemeProvider(initialPreferences?: Preferences) {
   );
   const [terminalThemeName, setTerminalThemeNameState] = useState(
     initialPreferences?.terminalTheme || DEFAULT_TERMINAL_THEME
+  );
+  const [fontSize, setFontSizeState] = useState(
+    initialPreferences?.fontSize || DEFAULT_FONT_SIZE
+  );
+  const [fontFamily, setFontFamilyState] = useState(
+    initialPreferences?.fontFamily || MONO_FONT
   );
   const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(resolveSystemTheme);
 
@@ -70,15 +88,29 @@ export function useThemeProvider(initialPreferences?: Preferences) {
     }).catch(() => {});
   }, []);
 
+  const allPrefs = useCallback(() => ({
+    uiTheme: uiMode, terminalTheme: terminalThemeName, fontSize, fontFamily,
+  }), [uiMode, terminalThemeName, fontSize, fontFamily]);
+
   const setUIMode = useCallback((mode: UIThemeMode) => {
     setUIModeState(mode);
-    savePreferences({ uiTheme: mode, terminalTheme: terminalThemeName });
-  }, [savePreferences, terminalThemeName]);
+    savePreferences({ ...allPrefs(), uiTheme: mode });
+  }, [savePreferences, allPrefs]);
 
   const setTerminalThemeName = useCallback((name: string) => {
     setTerminalThemeNameState(name);
-    savePreferences({ uiTheme: uiMode, terminalTheme: name });
-  }, [savePreferences, uiMode]);
+    savePreferences({ ...allPrefs(), terminalTheme: name });
+  }, [savePreferences, allPrefs]);
+
+  const setFontSize = useCallback((size: number) => {
+    setFontSizeState(size);
+    savePreferences({ ...allPrefs(), fontSize: size });
+  }, [savePreferences, allPrefs]);
+
+  const setFontFamily = useCallback((family: string) => {
+    setFontFamilyState(family);
+    savePreferences({ ...allPrefs(), fontFamily: family });
+  }, [savePreferences, allPrefs]);
 
   const terminalTheme = useMemo(() => getTerminalTheme(terminalThemeName), [terminalThemeName]);
 
@@ -89,5 +121,9 @@ export function useThemeProvider(initialPreferences?: Preferences) {
     terminalTheme,
     terminalThemeName,
     setTerminalThemeName,
-  }), [ui, uiMode, setUIMode, terminalTheme, terminalThemeName, setTerminalThemeName]);
+    fontSize,
+    setFontSize,
+    fontFamily,
+    setFontFamily,
+  }), [ui, uiMode, setUIMode, terminalTheme, terminalThemeName, setTerminalThemeName, fontSize, setFontSize, fontFamily, setFontFamily]);
 }

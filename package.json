@@ -3,5 +3,8 @@
   "private": true,
   "workspaces": [
     "packages/*"
-  ]
+  ],
+  "dependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.2.8"
+  }
 }

@@ -293,10 +293,12 @@ app.post('/api/auth/logout', standardLimiter, (_req, res) => {
 });
 
 app.put('/api/preferences', standardLimiter, requireAuth, requireCSRF, (req, res) => {
-  const { uiTheme, terminalTheme } = req.body;
+  const { uiTheme, terminalTheme, fontSize, fontFamily } = req.body;
   const prefs: Record<string, unknown> = {};
   if (typeof uiTheme === 'string') prefs.uiTheme = uiTheme;
   if (typeof terminalTheme === 'string') prefs.terminalTheme = terminalTheme;
+  if (typeof fontSize === 'number' && fontSize >= 10 && fontSize <= 24) prefs.fontSize = fontSize;
+  if (typeof fontFamily === 'string') prefs.fontFamily = fontFamily;
   setUserPreferences((req as AuthRequest).username, prefs);
   res.json({ ok: true });
 });

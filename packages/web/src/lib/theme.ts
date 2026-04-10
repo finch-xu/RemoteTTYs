@@ -59,6 +59,12 @@ export type UIThemeMode = 'light' | 'dark' | 'system';
 export const UI_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 export const MONO_FONT = 'Menlo, Monaco, "Courier New", monospace';
 
+export const FONT_FAMILIES = [
+  { label: 'System Mono', value: MONO_FONT },
+  { label: 'JetBrains Mono', value: '"JetBrains Mono Variable", monospace' },
+  { label: 'Cascadia Mono NF', value: 'CascadiaMonoNF, monospace' },
+];
+
 // --- Terminal Themes ---
 
 export interface TerminalTheme {
