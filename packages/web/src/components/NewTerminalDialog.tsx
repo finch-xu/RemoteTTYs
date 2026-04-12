@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useTheme } from '../hooks/useTheme';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { UI_FONT, MONO_FONT } from '../lib/theme';
 
 interface NewTerminalDialogProps {
@@ -18,16 +19,18 @@ export function NewTerminalDialog({ onSubmit, onCancel }: NewTerminalDialogProps
   const { ui } = useTheme();
   const [shell, setShell] = useState('');
   const [cwd, setCwd] = useState('~');
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, onCancel);
 
   const inputStyle: React.CSSProperties = {
     display: 'block', width: '100%', background: ui.surfaceAlt, border: `1px solid ${ui.border}`,
     borderRadius: 6, color: ui.textPrimary, padding: '8px 10px', fontSize: 13, marginTop: 4,
-    fontFamily: MONO_FONT, boxSizing: 'border-box', outline: 'none',
+    fontFamily: MONO_FONT, boxSizing: 'border-box',
   };
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: ui.overlay, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={onCancel}>
-      <div style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 380, fontFamily: UI_FONT }} onClick={e => e.stopPropagation()}>
+      <div ref={dialogRef} className="modal-content" style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 380, fontFamily: UI_FONT }} onClick={e => e.stopPropagation()} role="dialog" aria-label="New Terminal">
         <h3 style={{ margin: '0 0 14px', color: ui.textPrimary, fontSize: 16, fontWeight: 600 }}>New Terminal</h3>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>

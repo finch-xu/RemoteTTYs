@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { lightTheme, UI_FONT } from '../lib/theme';
+import { useTheme } from '../hooks/useTheme';
+import { UI_FONT } from '../lib/theme';
 
 interface SetupPageProps {
   onSetupComplete: () => void;
@@ -11,11 +12,11 @@ export function SetupPage({ onSetupComplete }: SetupPageProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const t = lightTheme;
+  const { ui: t } = useTheme();
 
   const inputStyle: React.CSSProperties = {
     background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8,
-    color: t.textPrimary, padding: '10px 14px', fontSize: 14, fontFamily: 'inherit', outline: 'none',
+    color: t.textPrimary, padding: '10px 14px', fontSize: 14, fontFamily: 'inherit',
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

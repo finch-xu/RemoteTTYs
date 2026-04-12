@@ -75,10 +75,17 @@ export function useThemeProvider(initialPreferences?: Preferences) {
   const resolvedTheme = uiMode === 'system' ? systemTheme : uiMode;
   const ui = resolvedTheme === 'dark' ? darkTheme : lightTheme;
 
-  // Update body background
+  // Update body background + sync CSS custom properties for global rules
   useEffect(() => {
     document.body.style.background = ui.bg;
-  }, [ui.bg]);
+    const root = document.documentElement;
+    root.style.setProperty('--rttys-accent', ui.accent);
+    root.style.setProperty('--rttys-bg', ui.bg);
+    root.style.setProperty('--rttys-surface', ui.surface);
+    root.style.setProperty('--rttys-border', ui.border);
+    root.style.setProperty('--rttys-surface-alt', ui.surfaceAlt);
+    root.style.setProperty('--rttys-text-secondary', ui.textSecondary);
+  }, [ui]);
 
   const savePreferences = useCallback((prefs: Preferences) => {
     apiFetch('/api/preferences', {

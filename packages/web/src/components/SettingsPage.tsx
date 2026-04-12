@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Check } from 'lucide-react';
 import { CreateTokenDialog } from './CreateTokenDialog';
 import { apiFetch } from '../lib/api';
 import { useTheme } from '../hooks/useTheme';
@@ -31,6 +32,8 @@ export function SettingsPage({ onAgentDeleted }: { onAgentDeleted?: () => void }
   const [serverKey, setServerKey] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const fetchTokens = useCallback(async () => {
     try {
@@ -77,9 +80,14 @@ export function SettingsPage({ onAgentDeleted }: { onAgentDeleted?: () => void }
     fetchTokens();
   };
 
-  const handleCopy = async (value: string) => {
+  const handleCopy = async (value: string, id: string) => {
     await navigator.clipboard.writeText(value);
+    setCopiedId(id);
+    clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopiedId(null), 2000);
   };
+
+  useEffect(() => () => clearTimeout(copyTimerRef.current), []);
 
   const handleResetFingerprint = async (agentId: string, agentName: string) => {
     if (!confirm(`Reset fingerprint for agent "${agentName}"? The agent will re-register its fingerprint on next connection.`)) return;
@@ -161,7 +169,7 @@ export function SettingsPage({ onAgentDeleted }: { onAgentDeleted?: () => void }
               style={{
                 width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13,
                 border: `1px solid ${ui.border}`, background: ui.surface, color: ui.textPrimary,
-                fontFamily: 'inherit', cursor: 'pointer', outline: 'none',
+                fontFamily: 'inherit', cursor: 'pointer',
               }}
             >
               {FONT_FAMILIES.map(f => (
@@ -234,8 +242,8 @@ export function SettingsPage({ onAgentDeleted }: { onAgentDeleted?: () => void }
                 <code style={{ fontSize: 12, color: ui.textSecondary, background: ui.surfaceAlt, padding: '4px 10px', borderRadius: 6, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: MONO_FONT }}>
                   {t.token.slice(0, 16)}...{t.token.slice(-8)}
                 </code>
-                <button style={{ background: ui.surfaceAlt, border: `1px solid ${ui.border}`, borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer', color: ui.textPrimary, fontFamily: 'inherit' }} onClick={() => handleCopy(t.token)}>
-                  Copy
+                <button style={{ background: ui.surfaceAlt, border: `1px solid ${ui.border}`, borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer', color: copiedId === `token-${t.id}` ? ui.online : ui.textPrimary, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => handleCopy(t.token, `token-${t.id}`)}>
+                  {copiedId === `token-${t.id}` ? <><Check size={12} strokeWidth={2} /> Copied!</> : 'Copy'}
                 </button>
               </div>
 
@@ -259,8 +267,8 @@ export function SettingsPage({ onAgentDeleted }: { onAgentDeleted?: () => void }
             <code style={{ fontSize: 12, color: ui.textSecondary, background: ui.surfaceAlt, padding: '8px 12px', borderRadius: 6, flex: 1, fontFamily: MONO_FONT, wordBreak: 'break-all' }}>
               {serverKey}
             </code>
-            <button style={{ background: ui.surfaceAlt, border: `1px solid ${ui.border}`, borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer', color: ui.textPrimary, fontFamily: 'inherit' }} onClick={() => handleCopy(serverKey)}>
-              Copy
+            <button style={{ background: ui.surfaceAlt, border: `1px solid ${ui.border}`, borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer', color: copiedId === 'server-key' ? ui.online : ui.textPrimary, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => handleCopy(serverKey, 'server-key')}>
+              {copiedId === 'server-key' ? <><Check size={12} strokeWidth={2} /> Copied!</> : 'Copy'}
             </button>
           </div>
         </div>

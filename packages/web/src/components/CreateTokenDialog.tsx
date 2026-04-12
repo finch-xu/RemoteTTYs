@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Check } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useTheme } from '../hooks/useTheme';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { UI_FONT, MONO_FONT } from '../lib/theme';
 
 interface CreateTokenDialogProps {
@@ -16,11 +18,17 @@ export function CreateTokenDialog({ onCreated, onCancel }: CreateTokenDialogProp
   const [loading, setLoading] = useState(false);
   const [createdToken, setCreatedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const handleEscape = useCallback(() => {
+    createdToken ? onCreated() : onCancel();
+  }, [createdToken, onCreated, onCancel]);
+  useFocusTrap(dialogRef, handleEscape);
 
   const inputStyle: React.CSSProperties = {
     display: 'block', width: '100%', background: ui.surfaceAlt, border: `1px solid ${ui.border}`,
     borderRadius: 6, color: ui.textPrimary, padding: '8px 10px', fontSize: 13, marginTop: 4,
-    fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none',
+    fontFamily: 'inherit', boxSizing: 'border-box',
   };
 
   const handleCreate = async () => {
@@ -39,18 +47,21 @@ export function CreateTokenDialog({ onCreated, onCancel }: CreateTokenDialogProp
     } catch { setError('Connection failed'); } finally { setLoading(false); }
   };
 
+  useEffect(() => () => clearTimeout(copyTimerRef.current), []);
+
   const handleCopy = async () => {
     if (createdToken) {
       await navigator.clipboard.writeText(createdToken);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
     }
   };
 
   if (createdToken) {
     return (
       <div style={{ position: 'fixed', inset: 0, background: ui.overlay, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={onCreated}>
-        <div style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 440, fontFamily: UI_FONT }} onClick={e => e.stopPropagation()}>
+        <div ref={dialogRef} className="modal-content" style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 440, fontFamily: UI_FONT }} onClick={e => e.stopPropagation()} role="dialog" aria-label="Token Created">
           <h3 style={{ margin: '0 0 12px', color: ui.textPrimary, fontSize: 16, fontWeight: 600 }}>Token Created</h3>
           <p style={{ color: ui.warning, fontSize: 13, margin: '0 0 12px' }}>
             Copy this token now. It will only be shown in the settings page.
@@ -59,8 +70,8 @@ export function CreateTokenDialog({ onCreated, onCancel }: CreateTokenDialogProp
             {createdToken}
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14 }}>
-            <button style={{ background: ui.surfaceAlt, border: `1px solid ${ui.border}`, borderRadius: 6, color: ui.textPrimary, padding: '7px 18px', cursor: 'pointer', fontSize: 13 }} onClick={handleCopy}>
-              {copied ? 'Copied!' : 'Copy to Clipboard'}
+            <button style={{ background: ui.surfaceAlt, border: `1px solid ${ui.border}`, borderRadius: 6, color: ui.textPrimary, padding: '7px 18px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }} onClick={handleCopy}>
+              {copied ? <><Check size={14} strokeWidth={2} color={ui.online} /> Copied!</> : 'Copy to Clipboard'}
             </button>
             <button style={{ background: ui.accent, border: 'none', borderRadius: 6, color: ui.accentText, padding: '7px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }} onClick={onCreated}>Done</button>
           </div>
@@ -74,7 +85,7 @@ export function CreateTokenDialog({ onCreated, onCancel }: CreateTokenDialogProp
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: ui.overlay, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={onCancel}>
-      <div style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 440, fontFamily: UI_FONT }} onClick={e => e.stopPropagation()}>
+      <div ref={dialogRef} className="modal-content" style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 440, fontFamily: UI_FONT }} onClick={e => e.stopPropagation()} role="dialog" aria-label="New Agent Token">
         <h3 style={{ margin: '0 0 14px', color: ui.textPrimary, fontSize: 16, fontWeight: 600 }}>New Agent Token</h3>
         <label style={{ display: 'block', color: ui.textSecondary, fontSize: 13, marginBottom: 10 }}>
           Label

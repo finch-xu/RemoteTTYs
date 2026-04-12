@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Monitor } from 'lucide-react';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useAgentStore } from './hooks/useAgentStore';
 import { ThemeContext, useTheme, useThemeProvider } from './hooks/useTheme';
@@ -26,6 +27,7 @@ function App() {
   const [authState, setAuthState] = useState<AuthState>('loading');
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [preferences, setPreferences] = useState<Preferences | undefined>();
+  const themeValue = useThemeProvider(preferences);
 
   useEffect(() => {
     Promise.all([
@@ -52,11 +54,33 @@ function App() {
     return () => window.removeEventListener('rttys:unauthorized', handler);
   }, []);
 
+  return (
+    <ThemeContext.Provider value={themeValue}>
+      <AppContent
+        authState={authState}
+        needsSetup={needsSetup}
+        setAuthState={setAuthState}
+        setNeedsSetup={setNeedsSetup}
+        setPreferences={setPreferences}
+      />
+    </ThemeContext.Provider>
+  );
+}
+
+function AppContent({ authState, needsSetup, setAuthState, setNeedsSetup, setPreferences }: {
+  authState: AuthState;
+  needsSetup: boolean | null;
+  setAuthState: (s: AuthState) => void;
+  setNeedsSetup: (s: boolean) => void;
+  setPreferences: (p: Preferences | undefined) => void;
+}) {
+  const { ui } = useTheme();
+
   // Loading
   if (needsSetup === null || authState === 'loading') {
     return (
-      <div style={loadingStyle}>
-        <span style={{ color: '#8C8580', fontSize: 20 }}>{'\u25cf'}</span> Loading...
+      <div style={{ ...loadingStyle, background: ui.bg, color: ui.textPrimary }}>
+        <div className="spinner" /> Loading...
       </div>
     );
   }
@@ -76,21 +100,11 @@ function App() {
     }} />;
   }
 
-  return <ThemedApp preferences={preferences} onLogout={async () => {
+  return <MainApp onLogout={async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     setAuthState('unauthenticated');
     setPreferences(undefined);
   }} />;
-}
-
-function ThemedApp({ preferences, onLogout }: { preferences?: Preferences; onLogout: () => void }) {
-  const themeValue = useThemeProvider(preferences);
-
-  return (
-    <ThemeContext.Provider value={themeValue}>
-      <MainApp onLogout={onLogout} />
-    </ThemeContext.Provider>
-  );
 }
 
 interface FingerprintWarningState {
@@ -151,7 +165,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
   if (!connected && view !== 'settings') {
     return (
       <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary }}>
-        <span style={{ color: ui.textSecondary, fontSize: 20 }}>{'\u25cf'}</span> Connecting to relay...
+        <div className="spinner" /> Connecting to relay...
       </div>
     );
   }
@@ -171,7 +185,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
           <SettingsPage onAgentDeleted={fetchAgents} />
         ) : agents.length === 0 ? (
           <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary, flexDirection: 'column', gap: 16 }}>
-            <div style={{ fontSize: 32, color: ui.textMuted }}>&#x1F5A5;</div>
+            <Monitor size={36} strokeWidth={1.5} color={ui.textMuted} />
             <div>No agents registered</div>
             <div style={{ fontSize: 13, color: ui.textSecondary, maxWidth: 320, textAlign: 'center', lineHeight: 1.5 }}>
               Create a token in Settings to connect your first agent.
@@ -246,8 +260,6 @@ const loadingStyle: React.CSSProperties = {
   justifyContent: 'center',
   flex: 1,
   height: '100vh',
-  background: '#FAF7F2',
-  color: '#2D2B28',
   fontFamily: UI_FONT,
   fontSize: 16,
   gap: 8,

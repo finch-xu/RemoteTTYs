@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { lightTheme, UI_FONT } from '../lib/theme';
+import { useTheme } from '../hooks/useTheme';
+import { UI_FONT } from '../lib/theme';
 
 interface LoginPageProps {
   onLogin: () => void;
@@ -10,7 +11,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const t = lightTheme;
+  const { ui: t } = useTheme();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +52,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           value={username}
           onChange={e => setUsername(e.target.value)}
           placeholder="Username"
-          style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, color: t.textPrimary, padding: '10px 14px', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
+          style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, color: t.textPrimary, padding: '10px 14px', fontSize: 14, fontFamily: 'inherit' }}
           autoFocus
         />
         <input
@@ -59,7 +60,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           value={password}
           onChange={e => setPassword(e.target.value)}
           placeholder="Password"
-          style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, color: t.textPrimary, padding: '10px 14px', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
+          style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, color: t.textPrimary, padding: '10px 14px', fontSize: 14, fontFamily: 'inherit' }}
         />
         {error && <div style={{ color: t.error, fontSize: 13 }}>{error}</div>}
         <button type="submit" style={{ background: t.accent, border: 'none', borderRadius: 8, color: t.accentText, padding: '10px', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, fontWeight: 500 }} disabled={loading}>

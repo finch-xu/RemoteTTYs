@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Plus } from 'lucide-react';
 import { TerminalView } from './TerminalView';
 import { NewTerminalDialog } from './NewTerminalDialog';
 import { useTheme } from '../hooks/useTheme';
@@ -136,20 +137,22 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
               <span>{s.label}</span>
               {s.exited && <span style={{ color: ui.textMuted, fontSize: 10, marginLeft: 4 }}>exited</span>}
               <button
-                style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', fontSize: 12, padding: '0 2px', marginLeft: 4, lineHeight: 1 }}
+                style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', padding: '0 2px', marginLeft: 4, lineHeight: 1, display: 'flex', alignItems: 'center' }}
                 onClick={(e) => { e.stopPropagation(); handleCloseTab(s.sessionId); }}
                 title="Close terminal"
+                aria-label="Close terminal"
               >
-                x
+                <X size={14} strokeWidth={1.75} />
               </button>
             </div>
           ))}
           <button
-            style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', fontSize: 18, padding: '2px 10px', lineHeight: 1 }}
+            style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', padding: '2px 10px', lineHeight: 1, display: 'flex', alignItems: 'center' }}
             onClick={() => setShowNewDialog(true)}
             title="New terminal"
+            aria-label="New terminal"
           >
-            +
+            <Plus size={18} strokeWidth={1.75} />
           </button>
         </div>
         <div style={{ color: ui.textSecondary, fontSize: 12, paddingRight: 10, fontFamily: MONO_FONT }}>

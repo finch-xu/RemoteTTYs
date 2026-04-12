@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { UI_FONT, MONO_FONT } from '../lib/theme';
 
 interface FingerprintWarningProps {
@@ -13,6 +15,8 @@ interface FingerprintWarningProps {
 export function FingerprintWarning({ agentName, storedFingerprint, currentFingerprint, onAccept, onReject }: FingerprintWarningProps) {
   const { ui } = useTheme();
   const [confirming, setConfirming] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, onReject);
 
   const monoBlockStyle: React.CSSProperties = {
     background: ui.surfaceAlt,
@@ -28,10 +32,10 @@ export function FingerprintWarning({ agentName, storedFingerprint, currentFinger
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: ui.overlay, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
-      <div style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 24, width: 480, maxWidth: 'calc(100vw - 32px)', fontFamily: UI_FONT }}>
+      <div ref={dialogRef} className="modal-content" style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 24, width: 480, maxWidth: 'calc(100vw - 32px)', fontFamily: UI_FONT }} role="alertdialog" aria-label="Identity Key Changed">
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <span style={{ fontSize: 22 }}>&#9888;</span>
+          <AlertTriangle size={22} strokeWidth={1.75} color={ui.error} />
           <h3 style={{ margin: 0, color: ui.error, fontSize: 17, fontWeight: 600 }}>
             Identity Key Changed
           </h3>

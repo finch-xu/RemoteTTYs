@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Settings, Sun, Moon, SunMoon, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { AgentInfo } from '../hooks/useAgentStore';
 import { useTheme } from '../hooks/useTheme';
 import { UI_FONT, MONO_FONT } from '../lib/theme';
@@ -6,6 +7,7 @@ import type { UIThemeMode } from '../lib/theme';
 
 const SIDEBAR_WIDTH = 200;
 const SIDEBAR_COLLAPSED_WIDTH = 48;
+const ICON_STROKE = 1.75;
 
 interface SidebarProps {
   agents: AgentInfo[];
@@ -23,10 +25,10 @@ function getOsLabel(os: string): string {
   return os;
 }
 
-const themeModeIcons: Record<UIThemeMode, string> = {
-  light: '\u2600',  // sun
-  dark: '\u263E',    // moon
-  system: '\u25D0',  // half circle
+const themeModeIcons: Record<UIThemeMode, typeof Sun> = {
+  light: Sun,
+  dark: Moon,
+  system: SunMoon,
 };
 
 const themeModeLabels: Record<UIThemeMode, string> = {
@@ -37,9 +39,15 @@ const themeModeLabels: Record<UIThemeMode, string> = {
 
 const themeCycle: UIThemeMode[] = ['light', 'dark', 'system'];
 
+const btnReset: React.CSSProperties = {
+  background: 'none', border: 'none', padding: 0, margin: 0,
+  font: 'inherit', cursor: 'pointer', textAlign: 'left' as const,
+};
+
 export function Sidebar({ agents, selectedAgentId, onSelectAgent, currentView, onViewChange, onLogout }: SidebarProps) {
   const { ui, uiMode, setUIMode } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const cycleTheme = () => {
     const idx = themeCycle.indexOf(uiMode);
@@ -48,12 +56,18 @@ export function Sidebar({ agents, selectedAgentId, onSelectAgent, currentView, o
 
   const width = collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
 
-  const itemStyle: React.CSSProperties = {
+  const itemStyle = (isActive: boolean, isHovered: boolean): React.CSSProperties => ({
+    ...btnReset,
     display: 'flex', alignItems: 'center', gap: 8,
+    width: `calc(100% - 12px)`,
     padding: collapsed ? '7px 0' : '7px 14px',
     justifyContent: collapsed ? 'center' : 'flex-start',
-    cursor: 'pointer', borderRadius: 6, margin: '1px 6px',
-  };
+    borderRadius: 6, margin: '1px 6px',
+    background: isActive ? ui.surfaceActive : isHovered ? ui.surfaceAlt : 'transparent',
+    boxSizing: 'border-box',
+  });
+
+  const ThemeIcon = themeModeIcons[uiMode];
 
   return (
     <div style={{ width, minWidth: width, background: ui.surface, borderRight: `1px solid ${ui.border}`, display: 'flex', flexDirection: 'column', fontFamily: UI_FONT, userSelect: 'none', transition: 'width 0.2s ease, min-width 0.2s ease', overflow: 'hidden' }}>
@@ -63,13 +77,14 @@ export function Sidebar({ agents, selectedAgentId, onSelectAgent, currentView, o
             Machines
           </span>
         )}
-        <span
+        <button
           onClick={() => setCollapsed(!collapsed)}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          style={{ cursor: 'pointer', fontSize: 16, color: ui.textSecondary, lineHeight: 1, padding: '2px 4px', borderRadius: 4 }}
+          style={{ ...btnReset, color: ui.textSecondary, lineHeight: 1, padding: '2px 4px', borderRadius: 4 }}
         >
-          {collapsed ? '\u276F' : '\u276E'}
-        </span>
+          {collapsed ? <ChevronRight size={16} strokeWidth={ICON_STROKE} /> : <ChevronLeft size={16} strokeWidth={ICON_STROKE} />}
+        </button>
       </div>
       <div style={{ flex: 1, overflow: 'auto' }}>
         {agents.length === 0 && !collapsed && (
@@ -78,11 +93,17 @@ export function Sidebar({ agents, selectedAgentId, onSelectAgent, currentView, o
           </div>
         )}
         {agents.map(agent => (
-          <div
+          <button
             key={agent.id}
-            style={{ ...itemStyle, background: agent.id === selectedAgentId && currentView === 'terminal' ? ui.surfaceActive : 'transparent' }}
+            style={itemStyle(
+              agent.id === selectedAgentId && currentView === 'terminal',
+              hoveredId === agent.id
+            )}
             onClick={() => onSelectAgent(agent.id)}
+            onMouseEnter={() => setHoveredId(agent.id)}
+            onMouseLeave={() => setHoveredId(null)}
             title={collapsed ? `${agent.name} (${getOsLabel(agent.os)})` : undefined}
+            aria-label={collapsed ? `${agent.name} (${getOsLabel(agent.os)})` : undefined}
           >
             <span style={{ color: agent.online ? ui.online : ui.textMuted, fontSize: 10, flexShrink: 0 }}>{'\u25cf'}</span>
             {!collapsed && (
@@ -96,26 +117,43 @@ export function Sidebar({ agents, selectedAgentId, onSelectAgent, currentView, o
                 </div>
               </div>
             )}
-          </div>
+          </button>
         ))}
       </div>
       <div style={{ borderTop: `1px solid ${ui.border}`, padding: '4px 0' }}>
-        <div
-          style={{ ...itemStyle, background: currentView === 'settings' ? ui.surfaceActive : 'transparent' }}
+        <button
+          style={itemStyle(currentView === 'settings', hoveredId === '_settings')}
           onClick={() => onViewChange('settings')}
+          onMouseEnter={() => setHoveredId('_settings')}
+          onMouseLeave={() => setHoveredId(null)}
           title={collapsed ? 'Settings' : undefined}
+          aria-label={collapsed ? 'Settings' : undefined}
         >
-          <span style={{ fontSize: 14, color: ui.textSecondary }}>{'\u2699'}</span>
+          <Settings size={16} strokeWidth={ICON_STROKE} color={ui.textSecondary} />
           {!collapsed && <span style={{ fontSize: 13, color: ui.textSecondary }}>Settings</span>}
-        </div>
-        <div style={itemStyle} onClick={cycleTheme} title={collapsed ? themeModeLabels[uiMode] : undefined}>
-          <span style={{ fontSize: 14, color: ui.textSecondary }}>{themeModeIcons[uiMode]}</span>
+        </button>
+        <button
+          style={itemStyle(false, hoveredId === '_theme')}
+          onClick={cycleTheme}
+          onMouseEnter={() => setHoveredId('_theme')}
+          onMouseLeave={() => setHoveredId(null)}
+          title={collapsed ? themeModeLabels[uiMode] : undefined}
+          aria-label={`Theme: ${themeModeLabels[uiMode]}`}
+        >
+          <ThemeIcon size={16} strokeWidth={ICON_STROKE} color={ui.textSecondary} />
           {!collapsed && <span style={{ fontSize: 13, color: ui.textSecondary }}>{themeModeLabels[uiMode]}</span>}
-        </div>
-        <div style={itemStyle} onClick={onLogout} title={collapsed ? 'Logout' : undefined}>
-          <span style={{ fontSize: 13, color: ui.textSecondary }}>{'\u2192'}</span>
+        </button>
+        <button
+          style={itemStyle(false, hoveredId === '_logout')}
+          onClick={onLogout}
+          onMouseEnter={() => setHoveredId('_logout')}
+          onMouseLeave={() => setHoveredId(null)}
+          title={collapsed ? 'Logout' : undefined}
+          aria-label={collapsed ? 'Logout' : undefined}
+        >
+          <LogOut size={16} strokeWidth={ICON_STROKE} color={ui.textSecondary} />
           {!collapsed && <span style={{ fontSize: 13, color: ui.textSecondary }}>Logout</span>}
-        </div>
+        </button>
       </div>
     </div>
   );
