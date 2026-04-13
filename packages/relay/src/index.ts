@@ -505,13 +505,15 @@ app.delete('/api/tokens/:token', standardLimiter, requireAuth, requireAdmin, req
 
 app.get('/api/audit', standardLimiter, requireAuth, (req, res) => {
   const authReq = req as AuthRequest;
-  const limit = parseInt(req.query.limit as string) || 50;
-  const before = req.query.before ? parseInt(req.query.before as string) : undefined;
-  const after = req.query.after ? parseInt(req.query.after as string) : undefined;
-  const action = req.query.action as string | undefined;
-  const startDate = req.query.startDate as string | undefined;
-  const endDate = req.query.endDate as string | undefined;
-  const search = (req.query.search as string | undefined)?.slice(0, 100);
+  const qstr = (v: unknown): string | undefined =>
+    typeof v === 'string' ? v : Array.isArray(v) ? String(v[0]) : undefined;
+  const limit = parseInt(qstr(req.query.limit) ?? '') || 50;
+  const before = req.query.before ? parseInt(qstr(req.query.before) ?? '') : undefined;
+  const after = req.query.after ? parseInt(qstr(req.query.after) ?? '') : undefined;
+  const action = qstr(req.query.action);
+  const startDate = qstr(req.query.startDate);
+  const endDate = qstr(req.query.endDate);
+  const search = qstr(req.query.search)?.slice(0, 100);
 
   // Validate action type
   if (action && !(AUDIT_ACTIONS as readonly string[]).includes(action)) {

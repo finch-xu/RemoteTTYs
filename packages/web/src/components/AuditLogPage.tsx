@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, RefreshCw } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useTheme } from '../hooks/useTheme';
 import { UI_FONT, MONO_FONT } from '../lib/theme';
@@ -11,6 +11,7 @@ import {
   CATEGORY_LABELS,
   getCategoryColors,
   relativeTime,
+  formatDateTime,
 } from '../lib/audit';
 import type { ActionCategory } from '../lib/audit';
 
@@ -163,7 +164,22 @@ export function AuditLogPage({ userRole }: { userRole: string }) {
 
   return (
     <div style={{ flex: 1, padding: 28, overflow: 'auto', fontFamily: UI_FONT }}>
-      <h2 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 600, color: ui.textPrimary }}>Audit Log</h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '0 0 20px' }}>
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: ui.textPrimary }}>Audit Log</h2>
+        <button
+          onClick={() => fetchLogs(undefined, undefined, true)}
+          disabled={loading}
+          title="Refresh"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 28, height: 28, borderRadius: 6, border: `1px solid ${ui.border}`,
+            background: 'transparent', color: ui.textSecondary, cursor: loading ? 'default' : 'pointer',
+            opacity: loading ? 0.5 : 1, transition: 'opacity 0.15s',
+          }}
+        >
+          <RefreshCw size={14} style={loading ? { animation: 'spin 1s linear infinite' } : undefined} />
+        </button>
+      </div>
 
       {/* Time presets */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -300,7 +316,7 @@ export function AuditLogPage({ userRole }: { userRole: string }) {
               background: ui.surfaceAlt, borderBottom: `1px solid ${ui.border}`,
               fontSize: 11, fontWeight: 600, color: ui.textSecondary, textTransform: 'uppercase', letterSpacing: '0.3px',
             }}>
-              <span style={{ width: 80 }}>Time</span>
+              <span style={{ width: 150 }}>Time</span>
               <span style={{ width: 140 }}>Action</span>
               <span style={{ width: 80 }}>User</span>
               <span style={{ flex: 1 }}>Detail</span>
@@ -319,10 +335,9 @@ export function AuditLogPage({ userRole }: { userRole: string }) {
                   }}
                 >
                   <span
-                    style={{ width: 80, color: ui.textMuted, fontSize: 11, flexShrink: 0 }}
-                    title={new Date(log.ts + 'Z').toLocaleString()}
+                    style={{ width: 150, color: ui.textMuted, fontSize: 11, flexShrink: 0, fontFamily: MONO_FONT }}
                   >
-                    {relativeTime(log.ts)}
+                    {formatDateTime(log.ts)}
                   </span>
                   <span style={{ width: 140, flexShrink: 0 }}>
                     <span style={{

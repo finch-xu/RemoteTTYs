@@ -68,3 +68,9 @@ export function relativeTime(isoDate: string): string {
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
 }
+
+export function formatDateTime(isoDate: string): string {
+  const d = new Date(isoDate + 'Z');
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
