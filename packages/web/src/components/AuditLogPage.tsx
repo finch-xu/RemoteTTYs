@@ -66,7 +66,7 @@ export function AuditLogPage({ userRole }: { userRole: string }) {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [filterKey, setFilterKey] = useState(0); // forces text input remount on clear
   const [cursorStack, setCursorStack] = useState<number[]>([]);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isAdmin = userRole === 'admin';
   const categoryColors = getCategoryColors(ui);
 
