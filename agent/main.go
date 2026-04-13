@@ -7,11 +7,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"gopkg.in/yaml.v3"
 )
@@ -85,7 +83,7 @@ func runForeground(config *Config) {
 	client := NewClient(config, identity)
 
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	notifyShutdownSignals(sigCh)
 	go func() {
 		<-sigCh
 		log.Printf("shutting down...")
@@ -126,7 +124,7 @@ func runDaemon() {
 	cmd := exec.Command(exe, args...)
 	cmd.Stdout = f
 	cmd.Stderr = f
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	setDaemonAttrs(cmd)
 
 	if err := cmd.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to start daemon: %v\n", err)
@@ -152,7 +150,7 @@ func runStop() {
 		os.Exit(1)
 	}
 
-	if err := proc.Signal(syscall.SIGTERM); err != nil {
+	if err := terminateProcess(proc); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to stop agent (pid=%d): %v\n", pid, err)
 		os.Exit(1)
 	}
@@ -168,7 +166,7 @@ func runStatus() {
 	}
 
 	proc, err := os.FindProcess(pid)
-	if err != nil || proc.Signal(syscall.Signal(0)) != nil {
+	if err != nil || !isProcessAlive(proc) {
 		fmt.Println("Status: not running (stale PID file)")
 		removePIDFile()
 		return

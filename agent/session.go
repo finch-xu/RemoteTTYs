@@ -9,16 +9,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
-
-	"github.com/creack/pty"
 )
 
 // allowedShells is a whitelist of shell basenames permitted for PTY sessions.
+// On Windows, the ".exe" suffix is stripped before lookup.
 var allowedShells = map[string]bool{
 	"bash": true, "sh": true, "zsh": true, "fish": true,
 	"dash": true, "ksh": true, "csh": true, "tcsh": true,
 	"pwsh": true, "nu": true, "elvish": true,
+	"powershell": true, "cmd": true,
 }
 
 // validateShell checks that a shell path is safe to execute.
@@ -30,8 +29,9 @@ func validateShell(shell string) (string, error) {
 	if strings.ContainsAny(shell, " \t\n;|&$`\\\"'(){}[]<>!#~") {
 		return "", fmt.Errorf("shell path contains invalid characters: %s", shell)
 	}
-	// Check basename against whitelist
+	// Check basename against whitelist (strip .exe suffix for Windows compatibility)
 	base := filepath.Base(shell)
+	base = strings.TrimSuffix(base, ".exe")
 	if !allowedShells[base] {
 		return "", fmt.Errorf("shell not in whitelist: %s", base)
 	}
@@ -71,10 +71,9 @@ func validateCwd(cwd string) (string, error) {
 }
 
 type Session struct {
-	ID         string
-	PTY        *os.File
-	Cmd        *exec.Cmd
-	Scrollback *RingBuffer
+	ID          string
+	pty         *PTYHandle
+	Scrollback  *RingBuffer
 	Keys        *SessionKeys
 	SendCounter uint64
 	RecvCounter uint64
@@ -147,7 +146,6 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 		log.Printf("session %s: rejected shell: %v", msg.SessionID, err)
 		return
 	}
-	cmd := exec.Command(resolvedShell)
 
 	// Resolve and validate working directory
 	cwd := msg.Cwd
@@ -167,14 +165,13 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 		if home, err := os.UserHomeDir(); err == nil {
 			validCwd = home
 		} else {
-			validCwd = "/"
+			validCwd = defaultFallbackCwd
 		}
 	}
-	cmd.Dir = validCwd
 
-	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+	env := append(os.Environ(), "TERM=xterm-256color")
 
-	ptmx, err := pty.Start(cmd)
+	ptyHandle, err := startPTY(resolvedShell, validCwd, env)
 	if err != nil {
 		log.Printf("failed to start pty for session %s: %v", msg.SessionID, err)
 		return
@@ -182,8 +179,7 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 
 	sess := &Session{
 		ID:         msg.SessionID,
-		PTY:        ptmx,
-		Cmd:        cmd,
+		pty:        ptyHandle,
 		Scrollback: NewRingBuffer(maxScrollbackBytes),
 		Keys:       keys,
 	}
@@ -195,12 +191,12 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 	c.Send(PtyCreatedMsg{
 		Type:      "pty.created",
 		SessionID: msg.SessionID,
-		PID:       cmd.Process.Pid,
+		PID:       ptyHandle.Pid(),
 		PublicKey: base64.StdEncoding.EncodeToString(agentPubRaw),
 		Signature: base64.StdEncoding.EncodeToString(signature),
 	})
 
-	log.Printf("session %s created (pid=%d, shell=%s, e2e=on)", msg.SessionID, cmd.Process.Pid, shell)
+	log.Printf("session %s created (pid=%d, shell=%s, e2e=on)", msg.SessionID, ptyHandle.Pid(), shell)
 
 	go c.readPTY(sess)
 }
@@ -208,7 +204,7 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 func (c *Client) readPTY(s *Session) {
 	buf := make([]byte, 32*1024)
 	for {
-		n, err := s.PTY.Read(buf)
+		n, err := s.pty.Read(buf)
 		if n > 0 {
 			s.Scrollback.Write(buf[:n])
 
@@ -229,11 +225,9 @@ func (c *Client) readPTY(s *Session) {
 		}
 	}
 
-	exitCode := 0
-	if err := s.Cmd.Wait(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
-		}
+	exitCode, waitErr := s.pty.Wait()
+	if waitErr != nil {
+		log.Printf("session %s: wait error: %v", s.ID, waitErr)
 	}
 
 	c.Send(PtyExitedMsg{
@@ -247,7 +241,7 @@ func (c *Client) readPTY(s *Session) {
 	c.mu.Unlock()
 
 	zeroKeys(s.Keys)
-	s.PTY.Close()
+	s.pty.Close()
 	log.Printf("session %s exited (code=%d)", s.ID, exitCode)
 }
 
@@ -284,7 +278,7 @@ func (c *Client) handlePtyData(msg IncomingMessage) {
 	}
 	sess.RecvCounter++
 
-	if _, err := sess.PTY.Write(data); err != nil {
+	if _, err := sess.pty.Write(data); err != nil {
 		log.Printf("session %s: pty write error: %v", msg.SessionID, err)
 	}
 }
@@ -305,10 +299,7 @@ func (c *Client) handlePtyResize(msg IncomingMessage) {
 		return
 	}
 
-	if err := pty.Setsize(sess.PTY, &pty.Winsize{
-		Rows: uint16(msg.Rows),
-		Cols: uint16(msg.Cols),
-	}); err != nil {
+	if err := sess.pty.Resize(uint16(msg.Rows), uint16(msg.Cols)); err != nil {
 		log.Printf("session %s: resize error: %v", msg.SessionID, err)
 	}
 }
@@ -344,9 +335,7 @@ func (c *Client) handlePtyClose(msg IncomingMessage) {
 		return
 	}
 
-	if sess.Cmd.Process != nil {
-		sess.Cmd.Process.Signal(syscall.SIGHUP)
-	}
+	sess.pty.Kill()
 }
 
 // verifyControlHMAC verifies the HMAC on a control message. Returns true if valid or absent.

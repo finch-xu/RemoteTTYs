@@ -1,9 +1,12 @@
-.PHONY: all agent relay web dev clean
+.PHONY: all agent agent-windows relay web dev clean
 
 all: agent relay web
 
 agent:
 	cd agent && go build -o ../bin/rttys-agent .
+
+agent-windows:
+	cd agent && GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o ../bin/rttys-agent.exe .
 
 relay:
 	cd packages/relay && npm run build

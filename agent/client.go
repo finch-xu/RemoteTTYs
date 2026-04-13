@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -258,9 +257,7 @@ func (c *Client) startHeartbeat() {
 func (c *Client) Shutdown() {
 	c.mu.Lock()
 	for _, sess := range c.sessions {
-		if sess.Cmd.Process != nil {
-			sess.Cmd.Process.Signal(syscall.SIGHUP)
-		}
+		sess.pty.Kill()
 	}
 	c.mu.Unlock()
 }

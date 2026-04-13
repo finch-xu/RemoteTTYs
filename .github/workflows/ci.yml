@@ -22,6 +22,12 @@ jobs:
         run: cd agent && go build ./...
       - name: Vet
         run: cd agent && go vet ./...
+      - name: Build (Windows cross-compile)
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+        run: cd agent && go build ./...
 
   relay:
     name: Relay + Web

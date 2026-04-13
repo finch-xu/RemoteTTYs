@@ -52,12 +52,8 @@ func findConfigFile() string {
 func LoadConfig() *Config {
 	cfg := &Config{
 		Relay:      "ws://localhost:8080/ws/agent",
-		Shell:      "/bin/sh",
+		Shell:      detectDefaultShell(),
 		MaxRetries: 10,
-	}
-
-	if sh := os.Getenv("SHELL"); sh != "" {
-		cfg.Shell = sh
 	}
 
 	if name, err := os.Hostname(); err == nil {

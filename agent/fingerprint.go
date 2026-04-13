@@ -4,10 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
-	"runtime"
 	"strings"
 )
 
@@ -43,35 +40,3 @@ func GetFingerprint() (string, error) {
 	return fp, nil
 }
 
-func getMachineID() (string, error) {
-	switch runtime.GOOS {
-	case "linux":
-		data, err := os.ReadFile("/etc/machine-id")
-		if err != nil {
-			// Fallback to /var/lib/dbus/machine-id
-			data, err = os.ReadFile("/var/lib/dbus/machine-id")
-			if err != nil {
-				return "", err
-			}
-		}
-		return strings.TrimSpace(string(data)), nil
-	case "darwin":
-		out, err := exec.Command("ioreg", "-rd1", "-c", "IOPlatformExpertDevice").Output()
-		if err != nil {
-			return "", err
-		}
-		re := regexp.MustCompile(`"IOPlatformUUID"\s*=\s*"([^"]+)"`)
-		match := re.FindSubmatch(out)
-		if match == nil {
-			return "", os.ErrNotExist
-		}
-		return string(match[1]), nil
-	default:
-		// For other platforms, use hostname as fallback
-		name, err := os.Hostname()
-		if err != nil {
-			return "", err
-		}
-		return name, nil
-	}
-}

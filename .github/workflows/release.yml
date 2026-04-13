@@ -27,6 +27,9 @@ jobs:
           - goos: linux
             goarch: arm64
             name: Linux-arm64
+          - goos: windows
+            goarch: amd64
+            name: Windows-x64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -37,13 +40,16 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: '0'
+          BUILD_NAME: ${{ matrix.name }}
         run: |
           cd agent
-          go build -trimpath -ldflags="-s -w" -o ../rttys-agent-${{ matrix.name }} .
+          EXT=""
+          if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
+          go build -trimpath -ldflags="-s -w" -o "../rttys-agent-${BUILD_NAME}${EXT}" .
       - uses: actions/upload-artifact@v4
         with:
           name: rttys-agent-${{ matrix.name }}
-          path: rttys-agent-${{ matrix.name }}
+          path: rttys-agent-${{ matrix.name }}*
 
   build-relay:
     name: Build Relay + Web
