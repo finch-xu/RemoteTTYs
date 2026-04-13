@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // allowedShells is a whitelist of shell basenames permitted for PTY sessions.
@@ -77,6 +78,7 @@ type Session struct {
 	Keys        *SessionKeys
 	SendCounter uint64
 	RecvCounter uint64
+	CreatedAt   time.Time
 }
 
 func (c *Client) handlePtyCreate(msg IncomingMessage) {
@@ -182,11 +184,13 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 		pty:        ptyHandle,
 		Scrollback: NewRingBuffer(maxScrollbackBytes),
 		Keys:       keys,
+		CreatedAt:  time.Now(),
 	}
 
 	c.mu.Lock()
 	c.sessions[msg.SessionID] = sess
 	c.mu.Unlock()
+	c.writeStatusFile()
 
 	c.Send(PtyCreatedMsg{
 		Type:      "pty.created",
@@ -239,6 +243,7 @@ func (c *Client) readPTY(s *Session) {
 	c.mu.Lock()
 	delete(c.sessions, s.ID)
 	c.mu.Unlock()
+	c.writeStatusFile()
 
 	zeroKeys(s.Keys)
 	s.pty.Close()

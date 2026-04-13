@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -79,8 +81,10 @@ func runForeground(config *Config) {
 	// Write PID file
 	writePIDFile()
 	defer removePIDFile()
+	defer removeStatusFile()
 
 	client := NewClient(config, identity)
+	client.writeStatusFile()
 
 	sigCh := make(chan os.Signal, 1)
 	notifyShutdownSignals(sigCh)
@@ -88,12 +92,14 @@ func runForeground(config *Config) {
 		<-sigCh
 		log.Printf("shutting down...")
 		client.Shutdown()
+		removeStatusFile()
 		removePIDFile()
 		os.Exit(0)
 	}()
 
 	if err := client.Run(); err != nil {
 		log.Printf("agent exited: %v", err)
+		removeStatusFile()
 		removePIDFile()
 		os.Exit(1)
 	}
@@ -169,14 +175,33 @@ func runStatus() {
 	if err != nil || !isProcessAlive(proc) {
 		fmt.Println("Status: not running (stale PID file)")
 		removePIDFile()
+		removeStatusFile()
 		return
 	}
 
 	config := LoadConfig()
-	fmt.Printf("Status: running (pid=%d)\n", pid)
-	fmt.Printf("Relay:  %s\n", config.Relay)
-	fmt.Printf("Name:   %s\n", config.Name)
-	fmt.Printf("Shell:  %s\n", config.Shell)
+	fmt.Printf("Status:   running (pid=%d)\n", pid)
+	fmt.Printf("Relay:    %s\n", config.Relay)
+	fmt.Printf("Name:     %s\n", config.Name)
+	fmt.Printf("Shell:    %s\n", config.Shell)
+	if data, err := os.ReadFile(rttysPath("status.json")); err == nil {
+		var status AgentStatus
+		if err := json.Unmarshal(data, &status); err == nil {
+			if len(status.Sessions) == 0 {
+				fmt.Printf("Sessions: 0\n")
+			} else {
+				fmt.Printf("Sessions: %d active\n", len(status.Sessions))
+				for _, s := range status.Sessions {
+					dur := time.Since(s.CreatedAt).Truncate(time.Second)
+					id := s.ID
+					if len(id) > 8 {
+						id = id[:8]
+					}
+					fmt.Printf("  %s  connected %s\n", id, formatDuration(dur))
+				}
+			}
+		}
+	}
 	identity, err := LoadOrCreateIdentity()
 	if err == nil {
 		fmt.Printf("  Fingerprint: %s\n", identity.Fingerprint())
@@ -269,6 +294,21 @@ func writePIDFile() {
 
 func removePIDFile() {
 	os.Remove(rttysPath("agent.pid"))
+}
+
+func removeStatusFile() {
+	os.Remove(rttysPath("status.json"))
+	os.Remove(rttysPath("status.json.tmp"))
+}
+
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
+	}
+	return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
 }
 
 func readPIDFile() (int, error) {

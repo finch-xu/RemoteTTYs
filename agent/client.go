@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -260,6 +261,44 @@ func (c *Client) Shutdown() {
 		sess.pty.Kill()
 	}
 	c.mu.Unlock()
+}
+
+// --- Status file for `rttys-agent status` ---
+
+type SessionInfo struct {
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type AgentStatus struct {
+	Sessions  []SessionInfo `json:"sessions"`
+	UpdatedAt time.Time     `json:"updated_at"`
+}
+
+// writeStatusFile atomically writes session status to ~/.rttys/status.json.
+func (c *Client) writeStatusFile() {
+	c.mu.Lock()
+	infos := make([]SessionInfo, 0, len(c.sessions))
+	for _, s := range c.sessions {
+		infos = append(infos, SessionInfo{ID: s.ID, CreatedAt: s.CreatedAt})
+	}
+	c.mu.Unlock()
+
+	status := AgentStatus{Sessions: infos, UpdatedAt: time.Now().UTC()}
+	data, err := json.Marshal(status)
+	if err != nil {
+		log.Printf("warning: failed to marshal status: %v", err)
+		return
+	}
+	tmp := rttysPath("status.json.tmp")
+	final := rttysPath("status.json")
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
+		log.Printf("warning: failed to write status file: %v", err)
+		return
+	}
+	if err := os.Rename(tmp, final); err != nil {
+		log.Printf("warning: failed to rename status file: %v", err)
+	}
 }
 
 func (c *Client) Send(msg interface{}) {
