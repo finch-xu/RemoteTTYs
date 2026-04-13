@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { getConfig } from './config.js';
-import { getUser, getAgentToken, hasAgentTokens, hashToken, getTokenVersion } from './db.js';
+import { getUser, getAgentToken, hasAgentTokens, hashToken } from './db.js';
 
 export function verifyAgentToken(token: string): { valid: boolean; hash?: string; label?: string } {
   // No tokens configured → reject all agents
@@ -23,23 +23,25 @@ export function generateJWT(username: string): string {
   const config = getConfig();
   const user = getUser(username);
   const tokenVersion = user?.token_version ?? 0;
-  return jwt.sign({ username, role: 'admin', tv: tokenVersion }, config.jwtSecret, {
+  const role = user?.role ?? 'admin';
+  return jwt.sign({ username, role, tv: tokenVersion }, config.jwtSecret, {
     expiresIn: '24h',
     algorithm: 'HS256',
   });
 }
 
-export function verifyJWT(token: string): { username: string } | null {
+export function verifyJWT(token: string): { username: string; role: string } | null {
   const config = getConfig();
   try {
     const payload = jwt.verify(token, config.jwtSecret, {
       algorithms: ['HS256'],
-    }) as { username: string; tv?: number };
+    }) as { username: string; role?: string; tv?: number };
     // Check that user still exists and token version matches
-    const currentVersion = getTokenVersion(payload.username);
-    if (currentVersion === undefined) return null; // User deleted
-    if (payload.tv !== undefined && payload.tv !== currentVersion) return null; // Password changed
-    return { username: payload.username };
+    const user = getUser(payload.username);
+    if (!user) return null; // User deleted
+    if (payload.tv !== undefined && payload.tv !== user.token_version) return null; // Password changed
+    // Always read role from DB to reflect real-time permission changes
+    return { username: payload.username, role: user.role ?? 'admin' };
   } catch {
     return null;
   }

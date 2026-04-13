@@ -66,6 +66,7 @@ export function initDB() {
   try { db.exec("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0"); } catch {}
   try { db.exec("ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'"); } catch {}
   try { db.exec("ALTER TABLE agents ADD COLUMN fingerprint TEXT"); } catch {}
+  try { db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'"); } catch {}
 
   console.log(`Database: ${dbPath}`);
 }
@@ -76,6 +77,7 @@ interface UserRow {
   id: number;
   username: string;
   password: string;
+  role: string;
   token_version: number;
   created_at: string;
 }
@@ -84,9 +86,9 @@ export function getUser(username: string): UserRow | undefined {
   return db.prepare('SELECT * FROM users WHERE username = ?').get(username) as UserRow | undefined;
 }
 
-export function createUser(username: string, password: string) {
+export function createUser(username: string, password: string, role: string = 'user') {
   const hash = bcrypt.hashSync(password, 10);
-  db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run(username, hash);
+  db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').run(username, hash, role);
 }
 
 export function deleteUser(username: string): boolean {
@@ -95,7 +97,7 @@ export function deleteUser(username: string): boolean {
 }
 
 export function listUsers() {
-  return db.prepare('SELECT id, username, created_at FROM users ORDER BY id').all();
+  return db.prepare('SELECT id, username, role, created_at FROM users ORDER BY id').all();
 }
 
 export function updatePassword(username: string, newPassword: string): boolean {
