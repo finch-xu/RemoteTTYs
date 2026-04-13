@@ -36,7 +36,8 @@ import {
   getAgentTokenById,
   setAgentTokenEnabled,
   hasUsers,
-  getAuditLogs,
+  queryAuditLogs,
+  AUDIT_ACTIONS,
   audit,
   listAgentsFromDB,
   deleteAgentFromDB,
@@ -503,8 +504,38 @@ app.delete('/api/tokens/:token', standardLimiter, requireAuth, requireAdmin, req
 // --- Audit Log ---
 
 app.get('/api/audit', standardLimiter, requireAuth, (req, res) => {
-  const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 100, 1), 1000);
-  res.json(getAuditLogs(limit));
+  const authReq = req as AuthRequest;
+  const limit = parseInt(req.query.limit as string) || 50;
+  const before = req.query.before ? parseInt(req.query.before as string) : undefined;
+  const after = req.query.after ? parseInt(req.query.after as string) : undefined;
+  const action = req.query.action as string | undefined;
+  const startDate = req.query.startDate as string | undefined;
+  const endDate = req.query.endDate as string | undefined;
+  const search = (req.query.search as string | undefined)?.slice(0, 100);
+
+  // Validate action type
+  if (action && !(AUDIT_ACTIONS as readonly string[]).includes(action)) {
+    res.status(400).json({ error: 'Invalid action type' });
+    return;
+  }
+
+  // Validate date format (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
+  const datePattern = /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/;
+  if (startDate && !datePattern.test(startDate)) {
+    res.status(400).json({ error: 'Invalid startDate format' });
+    return;
+  }
+  if (endDate && !datePattern.test(endDate)) {
+    res.status(400).json({ error: 'Invalid endDate format' });
+    return;
+  }
+
+  // Role-based filtering: non-admin users can only see their own logs
+  const user = authReq.role === 'admin'
+    ? (req.query.user as string | undefined)
+    : authReq.username;
+
+  res.json(queryAuditLogs({ limit, before, after, action, user, startDate, endDate, search }));
 });
 
 // --- Static Files ---

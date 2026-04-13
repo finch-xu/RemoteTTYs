@@ -58,6 +58,10 @@ export function initDB() {
       user       TEXT,
       detail     TEXT
     );
+
+    CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_ts ON audit_log(ts);
   `);
 
   // Migrations for existing databases
@@ -230,4 +234,95 @@ export function audit(action: string, user?: string, detail?: string) {
 
 export function getAuditLogs(limit = 100) {
   return db.prepare('SELECT * FROM audit_log ORDER BY id DESC LIMIT ?').all(limit);
+}
+
+export const AUDIT_ACTIONS = [
+  'login', 'login_fail', 'login_rate_limited', 'password_change',
+  'setup', 'user_create', 'user_delete',
+  'agent_connect', 'agent_disconnect', 'agent_reject', 'agent_delete', 'agent_fingerprint_reset',
+  'token_create', 'token_delete', 'token_toggle',
+  'session_create', 'session_close',
+] as const;
+
+export interface AuditQuery {
+  limit?: number;
+  before?: number;
+  after?: number;
+  action?: string;
+  user?: string;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+}
+
+export interface AuditResult {
+  logs: { id: number; ts: string; action: string; user: string | null; detail: string | null }[];
+  hasMore: boolean;
+  total: number;
+}
+
+export function queryAuditLogs(query: AuditQuery): AuditResult {
+  const limit = Math.min(Math.max(query.limit ?? 50, 1), 200);
+  const filterConditions: string[] = [];
+  const filterParams: (string | number)[] = [];
+
+  if (query.action) {
+    filterConditions.push('action = ?');
+    filterParams.push(query.action);
+  }
+  if (query.user) {
+    filterConditions.push('user = ?');
+    filterParams.push(query.user);
+  }
+  if (query.startDate) {
+    filterConditions.push('ts >= ?');
+    filterParams.push(query.startDate.length === 10 ? `${query.startDate} 00:00:00` : query.startDate);
+  }
+  if (query.endDate) {
+    filterConditions.push('ts <= ?');
+    filterParams.push(query.endDate.length === 10 ? `${query.endDate} 23:59:59` : query.endDate);
+  }
+  if (query.search) {
+    // Escape LIKE wildcards so user input is treated as literal text
+    const escaped = query.search.replace(/[%_]/g, c => `\\${c}`);
+    filterConditions.push("detail LIKE ? ESCAPE '\\'");
+    filterParams.push(`%${escaped}%`);
+  }
+
+  // Build cursor conditions separately so count query uses only filter params
+  const dataConditions = [...filterConditions];
+  const dataParams = [...filterParams];
+  const isBackward = query.after !== undefined;
+
+  if (query.before !== undefined) {
+    dataConditions.push('id < ?');
+    dataParams.push(query.before);
+  } else if (query.after !== undefined) {
+    dataConditions.push('id > ?');
+    dataParams.push(query.after);
+  }
+
+  const dataWhere = dataConditions.length > 0 ? `WHERE ${dataConditions.join(' AND ')}` : '';
+  const filterWhere = filterConditions.length > 0 ? `WHERE ${filterConditions.join(' AND ')}` : '';
+
+  // Fetch limit+1 to determine hasMore
+  const order = isBackward ? 'ASC' : 'DESC';
+  const rows = db.prepare(
+    `SELECT * FROM audit_log ${dataWhere} ORDER BY id ${order} LIMIT ?`
+  ).all(...dataParams, limit + 1) as AuditResult['logs'];
+
+  const hasMore = rows.length > limit;
+  const logs = rows.slice(0, limit);
+  if (isBackward) logs.reverse();
+
+  // Total count only on initial/filter-change requests (no cursor)
+  let total = 0;
+  if (query.before === undefined && query.after === undefined) {
+    const countResult = db.prepare(
+      `SELECT COUNT(*) as n FROM audit_log ${filterWhere}`
+    ).get(...filterParams) as { n: number };
+    total = countResult.n;
+  }
+
+  return { logs, hasMore, total };
 }
