@@ -204,7 +204,7 @@ function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLog
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {view === 'settings' ? (
-          <SettingsPage onAgentDeleted={fetchAgents} />
+          <SettingsPage onAgentDeleted={fetchAgents} userRole={userInfo?.role ?? 'user'} />
         ) : view === 'users' ? (
           <UserManagementPage />
         ) : view === 'audit' ? (

@@ -25,7 +25,7 @@ interface AgentInfo {
   lastSeen: string | null;
 }
 
-export function SettingsPage({ onAgentDeleted }: { onAgentDeleted?: () => void }) {
+export function SettingsPage({ onAgentDeleted, userRole }: { onAgentDeleted?: () => void; userRole?: string }) {
   const { ui, terminalThemeName, setTerminalThemeName, fontSize, setFontSize, fontFamily, setFontFamily } = useTheme();
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
@@ -100,6 +100,17 @@ export function SettingsPage({ onAgentDeleted }: { onAgentDeleted?: () => void }
     await apiFetch(`/api/agents/${agentId}`, { method: 'DELETE' });
     fetchAgents();
     onAgentDeleted?.();
+  };
+
+  const handleResetServerKey = async () => {
+    if (!confirm('Reset the server key? All agents will need their server_key config updated. Connected agents will continue working until they reconnect.')) return;
+    try {
+      const res = await apiFetch('/api/server-key/reset', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setServerKey(data.publicKey);
+      }
+    } catch {}
   };
 
   return (
@@ -270,6 +281,11 @@ export function SettingsPage({ onAgentDeleted }: { onAgentDeleted?: () => void }
             <button style={{ background: ui.surfaceAlt, border: `1px solid ${ui.border}`, borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer', color: copiedId === 'server-key' ? ui.online : ui.textPrimary, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => handleCopy(serverKey, 'server-key')}>
               {copiedId === 'server-key' ? <><Check size={12} strokeWidth={2} /> Copied!</> : 'Copy'}
             </button>
+            {userRole === 'admin' && (
+              <button style={{ background: 'none', border: `1px solid ${ui.border}`, borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer', color: ui.error, fontFamily: 'inherit' }} onClick={handleResetServerKey}>
+                Reset Key
+              </button>
+            )}
           </div>
         </div>
       )}

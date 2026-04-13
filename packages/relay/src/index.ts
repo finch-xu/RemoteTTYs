@@ -53,7 +53,7 @@ import {
   clearAgentFingerprint,
   getUserStats,
 } from './db.js';
-import { initServerKey, getServerPublicKey, signChallenge } from './serverKey.js';
+import { initServerKey, getServerPublicKey, signChallenge, resetServerKey } from './serverKey.js';
 import { createRateLimiter, RateLimitStore } from './rateLimit.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -62,7 +62,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 initDB();
 resetAllAgentsOffline();
 
-const dataDir = path.join(__dirname, '..', 'data');
+const dataDir = process.env.RTTYS_DB ? path.dirname(process.env.RTTYS_DB) : path.join(__dirname, '..', 'data');
 initServerKey(dataDir);
 
 const app = express();
@@ -379,6 +379,18 @@ app.delete('/api/agents/:id/fingerprint', standardLimiter, requireAuth, requireC
 
 app.get('/api/server-key', standardLimiter, requireAuth, (_req, res) => {
   res.json({ publicKey: getServerPublicKey() });
+});
+
+app.post('/api/server-key/reset', standardLimiter, requireAuth, requireAdmin, requireCSRF, (req, res) => {
+  const authReq = req as AuthRequest;
+  try {
+    const newPublicKey = resetServerKey();
+    audit('server_key_reset', authReq.username, `new_key=${newPublicKey.slice(0, 8)}...`);
+    res.json({ publicKey: newPublicKey });
+  } catch (err) {
+    console.error('Failed to reset server key:', err);
+    res.status(500).json({ error: 'Failed to reset server key' });
+  }
 });
 
 // --- User Management ---

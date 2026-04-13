@@ -321,6 +321,7 @@ export const AUDIT_ACTIONS = [
   'agent_connect', 'agent_disconnect', 'agent_reject', 'agent_delete', 'agent_fingerprint_reset',
   'token_create', 'token_delete', 'token_toggle',
   'session_create', 'session_close',
+  'server_key_reset',
 ] as const;
 
 export interface AuditQuery {

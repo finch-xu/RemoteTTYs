@@ -4,6 +4,7 @@ import path from 'path';
 
 let privateKey: KeyObject;
 let publicKeyBase64: string;
+let storedDataDir: string;
 
 /**
  * Initialize the server Ed25519 key pair.
@@ -11,6 +12,7 @@ let publicKeyBase64: string;
  * The private key is stored in PKCS8 DER format at `<dataDir>/server_ed25519`.
  */
 export function initServerKey(dataDir: string): void {
+  storedDataDir = dataDir;
   const keyPath = path.join(dataDir, 'server_ed25519');
 
   if (fs.existsSync(keyPath)) {
@@ -50,5 +52,28 @@ export function signChallenge(data: string): string {
  * Get the server's public key as a base64 string (raw 32 bytes).
  */
 export function getServerPublicKey(): string {
+  return publicKeyBase64;
+}
+
+/**
+ * Regenerate the server Ed25519 key pair.
+ * Overwrites the key on disk and updates in-memory state.
+ * Returns the new public key as base64.
+ */
+export function resetServerKey(): string {
+  const pair = generateKeyPairSync('ed25519');
+  privateKey = pair.privateKey;
+  const der = privateKey.export({ type: 'pkcs8', format: 'der' });
+  const keyPath = path.join(storedDataDir, 'server_ed25519');
+  fs.writeFileSync(keyPath, der, { mode: 0o600 });
+
+  const pubKey = createPublicKey(privateKey);
+  const spki = pubKey.export({ type: 'spki', format: 'der' });
+  if (spki.length !== 44) {
+    throw new Error(`Unexpected Ed25519 SPKI length: ${spki.length} (expected 44)`);
+  }
+  publicKeyBase64 = spki.subarray(12).toString('base64');
+
+  console.log(`Server key reset. New public key: ${publicKeyBase64}`);
   return publicKeyBase64;
 }
