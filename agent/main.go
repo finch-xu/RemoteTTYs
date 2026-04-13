@@ -126,6 +126,7 @@ func runDaemon() {
 		fmt.Fprintf(os.Stderr, "Failed to open log file: %v\n", err)
 		os.Exit(1)
 	}
+	defer f.Close()
 
 	cmd := exec.Command(exe, args...)
 	cmd.Stdout = f
@@ -136,8 +137,6 @@ func runDaemon() {
 		fmt.Fprintf(os.Stderr, "Failed to start daemon: %v\n", err)
 		os.Exit(1)
 	}
-
-	f.Close() // child inherits the fd; parent can release it
 
 	fmt.Printf("rttys-agent started (pid=%d, log=%s)\n", cmd.Process.Pid, logFile)
 }

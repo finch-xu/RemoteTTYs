@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -178,6 +179,13 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 		log.Printf("failed to start pty for session %s: %v", msg.SessionID, err)
 		return
 	}
+	ptyReady := false
+	defer func() {
+		if !ptyReady {
+			ptyHandle.Kill()
+			ptyHandle.Close()
+		}
+	}()
 
 	sess := &Session{
 		ID:         msg.SessionID,
@@ -202,18 +210,21 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 
 	log.Printf("session %s created (pid=%d, shell=%s, e2e=on)", msg.SessionID, ptyHandle.Pid(), shell)
 
+	ptyReady = true
+	c.sessionWg.Add(1)
 	go c.readPTY(sess)
 }
 
 func (c *Client) readPTY(s *Session) {
+	defer c.sessionWg.Done()
 	buf := make([]byte, 32*1024)
 	for {
 		n, err := s.pty.Read(buf)
 		if n > 0 {
 			s.Scrollback.Write(buf[:n])
 
-			encrypted := Encrypt(s.Keys.GCMA2B, buf[:n], DirectionA2B, s.SendCounter)
-			s.SendCounter++
+			counter := atomic.AddUint64(&s.SendCounter, 1) - 1
+			encrypted := Encrypt(s.Keys.GCMA2B, buf[:n], DirectionA2B, counter)
 			encoded := base64.StdEncoding.EncodeToString(encrypted)
 			c.Send(PtyDataMsg{
 				Type:      "pty.data",
@@ -320,8 +331,8 @@ func (c *Client) handlePtyReplayRequest(msg IncomingMessage) {
 		return
 	}
 
-	encrypted := Encrypt(sess.Keys.GCMA2B, data, DirectionA2B, sess.SendCounter)
-	sess.SendCounter++
+	counter := atomic.AddUint64(&sess.SendCounter, 1) - 1
+	encrypted := Encrypt(sess.Keys.GCMA2B, data, DirectionA2B, counter)
 
 	c.Send(PtyReplayMsg{
 		Type:      "pty.replay",

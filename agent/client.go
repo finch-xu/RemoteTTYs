@@ -26,6 +26,7 @@ type Client struct {
 	sendCh       chan []byte
 	done         chan struct{}
 	wg           sync.WaitGroup
+	sessionWg    sync.WaitGroup // tracks readPTY goroutines for graceful shutdown
 	serverPubKey ed25519.PublicKey
 	fingerprint  string
 	identity     *Identity
@@ -261,6 +262,7 @@ func (c *Client) Shutdown() {
 		sess.pty.Kill()
 	}
 	c.mu.Unlock()
+	c.sessionWg.Wait() // wait for all readPTY goroutines to finish cleanup
 }
 
 // --- Status file for `rttys-agent status` ---
