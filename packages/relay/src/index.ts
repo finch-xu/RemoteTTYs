@@ -171,6 +171,7 @@ function clearAuthCookies(res: express.Response) {
 // Auth middleware
 interface AuthRequest extends express.Request {
   username: string;
+  role: string;
 }
 
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -185,6 +186,7 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
     return;
   }
   (req as AuthRequest).username = result.username;
+  (req as AuthRequest).role = result.role;
   next();
 }
 
@@ -198,6 +200,14 @@ function requireCSRF(req: express.Request, res: express.Response, next: express.
   const headerToken = req.headers['x-csrf-token'] as string | undefined;
   if (!cookieToken || !headerToken || cookieToken !== headerToken) {
     res.status(403).json({ error: 'CSRF validation failed' });
+    return;
+  }
+  next();
+}
+
+function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if ((req as AuthRequest).role !== 'admin') {
+    res.status(403).json({ error: 'Admin access required' });
     return;
   }
   next();
@@ -235,7 +245,7 @@ app.post('/api/setup/init', strictLimiter, (req, res) => {
     res.status(400).json({ error: pwError });
     return;
   }
-  createUser(username, password);
+  createUser(username, password, 'admin');
   audit('setup', username, 'Initial admin account created');
   setAuthCookies(res, generateJWT(username), randomBytes(32).toString('hex'));
   res.json({ ok: true });
@@ -284,7 +294,7 @@ app.get('/api/auth/me', relaxedLimiter, (req, res) => {
     res.status(401).json({ error: 'Session expired' });
     return;
   }
-  res.json({ username: result.username, preferences: getUserPreferences(result.username) });
+  res.json({ username: result.username, role: result.role, preferences: getUserPreferences(result.username) });
 });
 
 app.post('/api/auth/logout', standardLimiter, (_req, res) => {
@@ -328,7 +338,7 @@ app.get('/api/agents', standardLimiter, requireAuth, (_req, res) => {
   res.json(agents);
 });
 
-app.delete('/api/agents/:id', standardLimiter, requireAuth, requireCSRF, (req, res) => {
+app.delete('/api/agents/:id', standardLimiter, requireAuth, requireAdmin, requireCSRF, (req, res) => {
   const id = req.params.id as string;
   if (deleteAgentFromDB(id)) {
     audit('agent_delete', (req as AuthRequest).username, `agentId=${id}`);
@@ -338,7 +348,7 @@ app.delete('/api/agents/:id', standardLimiter, requireAuth, requireCSRF, (req, r
   }
 });
 
-app.delete('/api/agents/:id/fingerprint', standardLimiter, requireAuth, requireCSRF, (req, res) => {
+app.delete('/api/agents/:id/fingerprint', standardLimiter, requireAuth, requireAdmin, requireCSRF, (req, res) => {
   const id = req.params.id as string;
   if (clearAgentFingerprint(id)) {
     audit('agent_fingerprint_reset', (req as AuthRequest).username, `agentId=${id}`);
@@ -356,11 +366,11 @@ app.get('/api/server-key', standardLimiter, requireAuth, (_req, res) => {
 
 // --- User Management ---
 
-app.get('/api/users', standardLimiter, requireAuth, (_req, res) => {
+app.get('/api/users', standardLimiter, requireAuth, requireAdmin, (_req, res) => {
   res.json(listUsers());
 });
 
-app.post('/api/users', standardLimiter, requireAuth, requireCSRF, (req, res) => {
+app.post('/api/users', standardLimiter, requireAuth, requireAdmin, requireCSRF, (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     res.status(400).json({ error: 'Username and password required' });
@@ -384,7 +394,7 @@ app.post('/api/users', standardLimiter, requireAuth, requireCSRF, (req, res) => 
   }
 });
 
-app.delete('/api/users/:username', standardLimiter, requireAuth, requireCSRF, (req, res) => {
+app.delete('/api/users/:username', standardLimiter, requireAuth, requireAdmin, requireCSRF, (req, res) => {
   const target = req.params.username as string;
   if (target === (req as AuthRequest).username) {
     res.status(400).json({ error: 'Cannot delete yourself' });
@@ -425,7 +435,7 @@ app.put('/api/users/:username/password', standardLimiter, requireAuth, requireCS
 
 // --- Agent Token Management ---
 
-app.get('/api/tokens', standardLimiter, requireAuth, (_req, res) => {
+app.get('/api/tokens', standardLimiter, requireAuth, requireAdmin, (_req, res) => {
   const tokens = listAgentTokens();
   const onlineAgents = getAllAgents();
   const tokenOnlineMap = new Map<string, string[]>();
@@ -443,7 +453,7 @@ app.get('/api/tokens', standardLimiter, requireAuth, (_req, res) => {
   res.json(enriched);
 });
 
-app.post('/api/tokens', standardLimiter, requireAuth, requireCSRF, (req, res) => {
+app.post('/api/tokens', standardLimiter, requireAuth, requireAdmin, requireCSRF, (req, res) => {
   const { label, notes } = req.body;
   if (!label) {
     res.status(400).json({ error: 'Label is required' });
@@ -459,7 +469,7 @@ app.post('/api/tokens', standardLimiter, requireAuth, requireCSRF, (req, res) =>
   }
 });
 
-app.put('/api/tokens/:id/enabled', standardLimiter, requireAuth, requireCSRF, (req, res) => {
+app.put('/api/tokens/:id/enabled', standardLimiter, requireAuth, requireAdmin, requireCSRF, (req, res) => {
   const id = parseInt(req.params.id as string, 10);
   const { enabled } = req.body;
   if (typeof enabled !== 'boolean') {
@@ -479,7 +489,7 @@ app.put('/api/tokens/:id/enabled', standardLimiter, requireAuth, requireCSRF, (r
   res.json({ ok: true });
 });
 
-app.delete('/api/tokens/:token', standardLimiter, requireAuth, requireCSRF, (req, res) => {
+app.delete('/api/tokens/:token', standardLimiter, requireAuth, requireAdmin, requireCSRF, (req, res) => {
   const token = req.params.token as string;
   disconnectAgentsByToken(token);
   if (deleteAgentToken(token)) {
