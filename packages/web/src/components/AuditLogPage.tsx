@@ -10,7 +10,6 @@ import {
   ACTIONS_BY_CATEGORY,
   CATEGORY_LABELS,
   getCategoryColors,
-  relativeTime,
   formatDateTime,
 } from '../lib/audit';
 import type { ActionCategory } from '../lib/audit';
