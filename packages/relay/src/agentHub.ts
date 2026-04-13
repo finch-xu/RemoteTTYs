@@ -111,6 +111,13 @@ export function handleAgentConnection(ws: WebSocket, preAuth: PreAuth) {
         lastSeen: Date.now(),
         identityKey: (msg as AgentHello).identityKey || '',
       };
+      // Close old connection if this agent is reconnecting before the old WS timed out
+      const existingConn = agents.get(agentId);
+      if (existingConn && existingConn.ws.readyState === WebSocket.OPEN) {
+        console.log(`Replacing existing connection for agent ${agentId}`);
+        existingConn.ws.close(4001, 'Replaced by new connection');
+      }
+
       agents.set(agentId, conn);
       console.log(`Agent connected: ${hello.name} (${agentId})`);
       audit('agent_connect', tokenLabel, `name=${hello.name}, os=${hello.os}`);
@@ -131,12 +138,18 @@ export function handleAgentConnection(ws: WebSocket, preAuth: PreAuth) {
 
   ws.on('close', () => {
     if (agentId) {
-      const agent = agents.get(agentId);
-      console.log(`Agent disconnected: ${agentId}`);
-      audit('agent_disconnect', undefined, `agentId=${agentId}, name=${agent?.name ?? 'unknown'}`);
-      setAgentOnline(agentId, false);
-      agents.delete(agentId);
-      onAgentDisconnect(agentId);
+      const current = agents.get(agentId);
+      // Only clean up if this WebSocket is still the active connection.
+      // If a newer connection replaced us, current.ws !== ws.
+      if (current && current.ws === ws) {
+        console.log(`Agent disconnected: ${agentId}`);
+        audit('agent_disconnect', undefined, `agentId=${agentId}, name=${current.name}`);
+        setAgentOnline(agentId, false);
+        agents.delete(agentId);
+        onAgentDisconnect(agentId);
+      } else {
+        console.log(`Stale connection closed for agent ${agentId} (already replaced)`);
+      }
     }
   });
 

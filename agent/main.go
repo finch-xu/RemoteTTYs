@@ -78,6 +78,11 @@ func runForeground(config *Config) {
 
 	log.Printf("rttys-agent starting (name=%s, relay=%s, shell=%s)", config.Name, config.Relay, config.Shell)
 
+	// Prevent duplicate instances from clobbering each other's PID files
+	if err := checkExistingInstance(); err != nil {
+		log.Fatal(err)
+	}
+
 	// Write PID file
 	writePIDFile()
 	defer removePIDFile()
@@ -106,6 +111,11 @@ func runForeground(config *Config) {
 }
 
 func runDaemon() {
+	if err := checkExistingInstance(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
 	exe, err := os.Executable()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -316,6 +326,30 @@ func readPIDFile() (int, error) {
 		return 0, err
 	}
 	return strconv.Atoi(strings.TrimSpace(string(data)))
+}
+
+// checkExistingInstance returns an error if another agent instance is already running.
+// If a stale PID file exists (process dead), it is cleaned up automatically.
+func checkExistingInstance() error {
+	pid, err := readPIDFile()
+	if err != nil {
+		return nil
+	}
+
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		removePIDFile()
+		return nil
+	}
+
+	if isProcessAlive(proc) {
+		return fmt.Errorf("another agent instance is already running (pid=%d); run 'rttys-agent stop' first", pid)
+	}
+
+	log.Printf("cleaning up stale PID file (pid=%d no longer running)", pid)
+	removePIDFile()
+	removeStatusFile()
+	return nil
 }
 
 func maskToken(token string) string {
