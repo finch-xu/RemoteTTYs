@@ -8,12 +8,13 @@ import { TerminalTabs } from './components/TerminalTabs';
 import { LoginPage } from './components/LoginPage';
 import { SetupPage } from './components/SetupPage';
 import { SettingsPage } from './components/SettingsPage';
+import { AuditLogPage } from './components/AuditLogPage';
 import { FingerprintWarning } from './components/FingerprintWarning';
 import { checkAgentIdentity, acceptNewIdentity } from './lib/knownAgents';
 import type { TOFUResult } from './lib/knownAgents';
 import { UI_FONT } from './lib/theme';
 
-type AppView = 'terminal' | 'settings';
+type AppView = 'terminal' | 'settings' | 'audit';
 type AuthState = 'loading' | 'authenticated' | 'unauthenticated';
 
 interface Preferences {
@@ -23,10 +24,20 @@ interface Preferences {
   fontFamily?: string;
 }
 
+interface UserInfo {
+  username: string;
+  role: string;
+}
+
+function parseUserInfo(meData: { username?: string; role?: string }): UserInfo {
+  return { username: meData.username ?? '', role: meData.role ?? 'user' };
+}
+
 function App() {
   const [authState, setAuthState] = useState<AuthState>('loading');
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [preferences, setPreferences] = useState<Preferences | undefined>();
+  const [userInfo, setUserInfo] = useState<UserInfo | undefined>();
   const themeValue = useThemeProvider(preferences);
 
   useEffect(() => {
@@ -38,6 +49,7 @@ function App() {
       if (meData) {
         setAuthState('authenticated');
         setPreferences(meData.preferences);
+        setUserInfo(parseUserInfo(meData));
       } else {
         setAuthState('unauthenticated');
       }
@@ -59,20 +71,24 @@ function App() {
       <AppContent
         authState={authState}
         needsSetup={needsSetup}
+        userInfo={userInfo}
         setAuthState={setAuthState}
         setNeedsSetup={setNeedsSetup}
         setPreferences={setPreferences}
+        setUserInfo={setUserInfo}
       />
     </ThemeContext.Provider>
   );
 }
 
-function AppContent({ authState, needsSetup, setAuthState, setNeedsSetup, setPreferences }: {
+function AppContent({ authState, needsSetup, userInfo, setAuthState, setNeedsSetup, setPreferences, setUserInfo }: {
   authState: AuthState;
   needsSetup: boolean | null;
+  userInfo: UserInfo | undefined;
   setAuthState: (s: AuthState) => void;
   setNeedsSetup: (s: boolean) => void;
   setPreferences: (p: Preferences | undefined) => void;
+  setUserInfo: (u: UserInfo | undefined) => void;
 }) {
   const { ui } = useTheme();
 
@@ -92,18 +108,22 @@ function AppContent({ authState, needsSetup, setAuthState, setNeedsSetup, setPre
 
   if (authState !== 'authenticated') {
     return <LoginPage onLogin={() => {
-      // Re-fetch preferences after login
+      // Re-fetch preferences and user info after login
       fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(data => {
-        if (data) setPreferences(data.preferences);
+        if (data) {
+          setPreferences(data.preferences);
+          setUserInfo(parseUserInfo(data));
+        }
       }).catch(() => {});
       setAuthState('authenticated');
     }} />;
   }
 
-  return <MainApp onLogout={async () => {
+  return <MainApp userInfo={userInfo} onLogout={async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     setAuthState('unauthenticated');
     setPreferences(undefined);
+    setUserInfo(undefined);
   }} />;
 }
 
@@ -115,7 +135,7 @@ interface FingerprintWarningState {
   currentFingerprint: string;
 }
 
-function MainApp({ onLogout }: { onLogout: () => void }) {
+function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLogout: () => void }) {
   const { ui } = useTheme();
   const { connected, send, subscribe } = useWebSocket();
   const { agents, selectedAgent, selectedAgentId, selectAgent, deleteAgent, fetchAgents } = useAgentStore(subscribe);
@@ -162,7 +182,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
     setFingerprintWarning(null);
   }, []);
 
-  if (!connected && view !== 'settings') {
+  if (!connected && view !== 'settings' && view !== 'audit') {
     return (
       <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary }}>
         <div className="spinner" /> Connecting to relay...
@@ -183,6 +203,8 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {view === 'settings' ? (
           <SettingsPage onAgentDeleted={fetchAgents} />
+        ) : view === 'audit' ? (
+          <AuditLogPage userRole={userInfo?.role ?? 'user'} />
         ) : agents.length === 0 ? (
           <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary, flexDirection: 'column', gap: 16 }}>
             <Monitor size={36} strokeWidth={1.5} color={ui.textMuted} />

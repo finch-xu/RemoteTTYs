@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, Sun, Moon, SunMoon, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Settings, Sun, Moon, SunMoon, LogOut, ChevronLeft, ChevronRight, ScrollText } from 'lucide-react';
 import type { AgentInfo } from '../hooks/useAgentStore';
 import { useTheme } from '../hooks/useTheme';
 import { UI_FONT, MONO_FONT } from '../lib/theme';
@@ -13,8 +13,8 @@ interface SidebarProps {
   agents: AgentInfo[];
   selectedAgentId: string | null;
   onSelectAgent: (agentId: string) => void;
-  currentView: 'terminal' | 'settings';
-  onViewChange: (view: 'terminal' | 'settings') => void;
+  currentView: 'terminal' | 'settings' | 'audit';
+  onViewChange: (view: 'terminal' | 'settings' | 'audit') => void;
   onLogout: () => void;
 }
 
@@ -121,6 +121,17 @@ export function Sidebar({ agents, selectedAgentId, onSelectAgent, currentView, o
         ))}
       </div>
       <div style={{ borderTop: `1px solid ${ui.border}`, padding: '4px 0' }}>
+        <button
+          style={itemStyle(currentView === 'audit', hoveredId === '_audit')}
+          onClick={() => onViewChange('audit')}
+          onMouseEnter={() => setHoveredId('_audit')}
+          onMouseLeave={() => setHoveredId(null)}
+          title={collapsed ? 'Audit Log' : undefined}
+          aria-label={collapsed ? 'Audit Log' : undefined}
+        >
+          <ScrollText size={16} strokeWidth={ICON_STROKE} color={ui.textSecondary} />
+          {!collapsed && <span style={{ fontSize: 13, color: ui.textSecondary }}>Audit Log</span>}
+        </button>
         <button
           style={itemStyle(currentView === 'settings', hoveredId === '_settings')}
           onClick={() => onViewChange('settings')}
