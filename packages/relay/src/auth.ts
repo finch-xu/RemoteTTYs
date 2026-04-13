@@ -30,7 +30,7 @@ export function generateJWT(username: string): string {
   });
 }
 
-export function verifyJWT(token: string): { username: string; role: string } | null {
+export function verifyJWT(token: string): { username: string; role: string; userId: number } | null {
   const config = getConfig();
   try {
     const payload = jwt.verify(token, config.jwtSecret, {
@@ -41,7 +41,7 @@ export function verifyJWT(token: string): { username: string; role: string } | n
     if (!user) return null; // User deleted
     if (payload.tv !== undefined && payload.tv !== user.token_version) return null; // Password changed
     // Always read role from DB to reflect real-time permission changes
-    return { username: payload.username, role: user.role ?? 'admin' };
+    return { username: payload.username, role: user.role ?? 'admin', userId: user.id };
   } catch {
     return null;
   }

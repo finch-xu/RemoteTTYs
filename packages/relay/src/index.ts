@@ -7,6 +7,7 @@ import {
   handleAgentConnection,
   setAgentMessageHandler,
   setAgentDisconnectHandler,
+  getAgent,
   getAllAgents,
   disconnectAgentsByToken,
 } from './agentHub.js';
@@ -14,6 +15,7 @@ import {
   handleBrowserConnection,
   setBrowserMessageHandler,
   setBrowserDisconnectHandler,
+  disconnectBrowsersByUserId,
 } from './browserHub.js';
 import {
   handleAgentMessage,
@@ -30,22 +32,26 @@ import {
   createUser,
   deleteUser,
   updatePassword,
-  listAgentTokens,
   createAgentToken,
   deleteAgentToken,
   getAgentTokenById,
   setAgentTokenEnabled,
+  listAgentTokensByUser,
+  isTokenOwnedByUser,
+  isTokenHashOwnedByUser,
+  isAgentOwnedByUser,
   hasUsers,
   queryAuditLogs,
   AUDIT_ACTIONS,
   audit,
-  listAgentsFromDB,
+  listAgentsByUser,
   deleteAgentFromDB,
   resetAllAgentsOffline,
   hashToken,
   getUserPreferences,
   setUserPreferences,
   clearAgentFingerprint,
+  getUserStats,
 } from './db.js';
 import { initServerKey, getServerPublicKey, signChallenge } from './serverKey.js';
 import { createRateLimiter, RateLimitStore } from './rateLimit.js';
@@ -133,13 +139,14 @@ server.on('upgrade', (request, socket, head) => {
       }
     }
     const sessionCookie = parseCookie(request.headers.cookie, 'rttys-session');
-    if (!sessionCookie || !verifyJWT(sessionCookie)) {
+    const jwtPayload = sessionCookie ? verifyJWT(sessionCookie) : null;
+    if (!jwtPayload) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();
       return;
     }
     browserWss.handleUpgrade(request, socket, head, (ws) => {
-      handleBrowserConnection(ws);
+      handleBrowserConnection(ws, { username: jwtPayload.username, userId: jwtPayload.userId });
     });
   } else {
     socket.destroy();
@@ -173,6 +180,7 @@ function clearAuthCookies(res: express.Response) {
 interface AuthRequest extends express.Request {
   username: string;
   role: string;
+  userId: number;
 }
 
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -188,6 +196,7 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
   }
   (req as AuthRequest).username = result.username;
   (req as AuthRequest).role = result.role;
+  (req as AuthRequest).userId = result.userId;
   next();
 }
 
@@ -316,43 +325,50 @@ app.put('/api/preferences', standardLimiter, requireAuth, requireCSRF, (req, res
 
 // --- Agents ---
 
-app.get('/api/agents', standardLimiter, requireAuth, (_req, res) => {
-  const dbAgents = listAgentsFromDB();
-  const onlineAgents = getAllAgents();
-  const sessionMap = new Map<string, string[]>();
-  const identityKeyMap = new Map<string, string>();
-  for (const a of onlineAgents) {
-    sessionMap.set(a.id, Array.from(a.sessions));
-    if (a.identityKey) identityKeyMap.set(a.id, a.identityKey);
-  }
-  const agents = dbAgents.map((a) => ({
-    id: a.id,
-    name: a.name,
-    os: a.os,
-    online: !!a.online,
-    sessions: sessionMap.get(a.id) ?? [],
-    fingerprint: a.fingerprint,
-    identityKey: identityKeyMap.get(a.id) ?? null,
-    lastSeen: a.last_seen,
-    createdAt: a.created_at,
-  }));
+app.get('/api/agents', standardLimiter, requireAuth, (req, res) => {
+  const authReq = req as AuthRequest;
+  const dbAgents = listAgentsByUser(authReq.userId);
+  const agents = dbAgents.map((a) => {
+    const online = getAgent(a.id);
+    return {
+      id: a.id,
+      name: a.name,
+      os: a.os,
+      online: !!a.online,
+      sessions: online ? Array.from(online.sessions) : [],
+      fingerprint: a.fingerprint,
+      identityKey: online?.identityKey ?? null,
+      lastSeen: a.last_seen,
+      createdAt: a.created_at,
+    };
+  });
   res.json(agents);
 });
 
-app.delete('/api/agents/:id', standardLimiter, requireAuth, requireAdmin, requireCSRF, (req, res) => {
+app.delete('/api/agents/:id', standardLimiter, requireAuth, requireCSRF, (req, res) => {
+  const authReq = req as AuthRequest;
   const id = req.params.id as string;
+  if (!isAgentOwnedByUser(id, authReq.userId)) {
+    res.status(403).json({ error: 'Not your agent' });
+    return;
+  }
   if (deleteAgentFromDB(id)) {
-    audit('agent_delete', (req as AuthRequest).username, `agentId=${id}`);
+    audit('agent_delete', authReq.username, `agentId=${id}`);
     res.json({ ok: true });
   } else {
     res.status(404).json({ error: 'Agent not found' });
   }
 });
 
-app.delete('/api/agents/:id/fingerprint', standardLimiter, requireAuth, requireAdmin, requireCSRF, (req, res) => {
+app.delete('/api/agents/:id/fingerprint', standardLimiter, requireAuth, requireCSRF, (req, res) => {
+  const authReq = req as AuthRequest;
   const id = req.params.id as string;
+  if (!isAgentOwnedByUser(id, authReq.userId)) {
+    res.status(403).json({ error: 'Not your agent' });
+    return;
+  }
   if (clearAgentFingerprint(id)) {
-    audit('agent_fingerprint_reset', (req as AuthRequest).username, `agentId=${id}`);
+    audit('agent_fingerprint_reset', authReq.username, `agentId=${id}`);
     res.json({ ok: true });
   } else {
     res.status(404).json({ error: 'Agent not found' });
@@ -401,7 +417,14 @@ app.delete('/api/users/:username', standardLimiter, requireAuth, requireAdmin, r
     res.status(400).json({ error: 'Cannot delete yourself' });
     return;
   }
-  if (deleteUser(target)) {
+  const result = deleteUser(target);
+  if (result.deleted) {
+    for (const tokenHash of result.tokenHashes) {
+      disconnectAgentsByToken(tokenHash);
+    }
+    if (result.userId !== undefined) {
+      disconnectBrowsersByUserId(result.userId);
+    }
     audit('user_delete', (req as AuthRequest).username, `target=${target}`);
     res.json({ ok: true });
   } else {
@@ -409,13 +432,8 @@ app.delete('/api/users/:username', standardLimiter, requireAuth, requireAdmin, r
   }
 });
 
-app.put('/api/users/:username/password', standardLimiter, requireAuth, requireCSRF, (req, res) => {
+app.put('/api/users/:username/password', standardLimiter, requireAuth, requireAdmin, requireCSRF, (req, res) => {
   const target = req.params.username as string;
-  // Users can only change their own password
-  if (target !== (req as AuthRequest).username) {
-    res.status(403).json({ error: 'Can only change your own password' });
-    return;
-  }
   const { password } = req.body;
   if (!password) {
     res.status(400).json({ error: 'Password required' });
@@ -427,7 +445,7 @@ app.put('/api/users/:username/password', standardLimiter, requireAuth, requireCS
     return;
   }
   if (updatePassword(target, password)) {
-    audit('password_change', (req as AuthRequest).username);
+    audit('password_change', (req as AuthRequest).username, `target=${target}`);
     res.json({ ok: true });
   } else {
     res.status(404).json({ error: 'User not found' });
@@ -436,11 +454,14 @@ app.put('/api/users/:username/password', standardLimiter, requireAuth, requireCS
 
 // --- Agent Token Management ---
 
-app.get('/api/tokens', standardLimiter, requireAuth, requireAdmin, (_req, res) => {
-  const tokens = listAgentTokens();
+app.get('/api/tokens', standardLimiter, requireAuth, (req, res) => {
+  const authReq = req as AuthRequest;
+  const tokens = listAgentTokensByUser(authReq.userId);
+  const userTokenHashes = new Set(tokens.map(t => t.token));
   const onlineAgents = getAllAgents();
   const tokenOnlineMap = new Map<string, string[]>();
   for (const agent of onlineAgents) {
+    if (!userTokenHashes.has(agent.token)) continue;
     if (!tokenOnlineMap.has(agent.token)) {
       tokenOnlineMap.set(agent.token, []);
     }
@@ -454,7 +475,8 @@ app.get('/api/tokens', standardLimiter, requireAuth, requireAdmin, (_req, res) =
   res.json(enriched);
 });
 
-app.post('/api/tokens', standardLimiter, requireAuth, requireAdmin, requireCSRF, (req, res) => {
+app.post('/api/tokens', standardLimiter, requireAuth, requireCSRF, (req, res) => {
+  const authReq = req as AuthRequest;
   const { label, notes } = req.body;
   if (!label) {
     res.status(400).json({ error: 'Label is required' });
@@ -462,15 +484,16 @@ app.post('/api/tokens', standardLimiter, requireAuth, requireAdmin, requireCSRF,
   }
   const token = randomBytes(32).toString('hex');
   try {
-    createAgentToken(hashToken(token), label, notes ?? '');
-    audit('token_create', (req as AuthRequest).username, `label=${label}`);
+    createAgentToken(hashToken(token), label, notes ?? '', authReq.userId);
+    audit('token_create', authReq.username, `label=${label}`);
     res.json({ ok: true, token });  // Return raw token once; DB stores hash
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to create token' });
   }
 });
 
-app.put('/api/tokens/:id/enabled', standardLimiter, requireAuth, requireAdmin, requireCSRF, (req, res) => {
+app.put('/api/tokens/:id/enabled', standardLimiter, requireAuth, requireCSRF, (req, res) => {
+  const authReq = req as AuthRequest;
   const id = parseInt(req.params.id as string, 10);
   const { enabled } = req.body;
   if (typeof enabled !== 'boolean') {
@@ -482,23 +505,38 @@ app.put('/api/tokens/:id/enabled', standardLimiter, requireAuth, requireAdmin, r
     res.status(404).json({ error: 'Token not found' });
     return;
   }
+  if (!isTokenOwnedByUser(id, authReq.userId)) {
+    res.status(403).json({ error: 'Not your token' });
+    return;
+  }
   setAgentTokenEnabled(id, enabled);
-  audit('token_toggle', (req as AuthRequest).username, `id=${id}, label=${tokenRow.label}, enabled=${enabled}`);
+  audit('token_toggle', authReq.username, `id=${id}, label=${tokenRow.label}, enabled=${enabled}`);
   if (!enabled) {
     disconnectAgentsByToken(tokenRow.token);
   }
   res.json({ ok: true });
 });
 
-app.delete('/api/tokens/:token', standardLimiter, requireAuth, requireAdmin, requireCSRF, (req, res) => {
+app.delete('/api/tokens/:token', standardLimiter, requireAuth, requireCSRF, (req, res) => {
+  const authReq = req as AuthRequest;
   const token = req.params.token as string;
+  if (!isTokenHashOwnedByUser(token, authReq.userId)) {
+    res.status(403).json({ error: 'Not your token' });
+    return;
+  }
   disconnectAgentsByToken(token);
   if (deleteAgentToken(token)) {
-    audit('token_delete', (req as AuthRequest).username, `token=${token.slice(0, 8)}...`);
+    audit('token_delete', authReq.username, `token=${token.slice(0, 8)}...`);
     res.json({ ok: true });
   } else {
     res.status(404).json({ error: 'Token not found' });
   }
+});
+
+// --- Admin Stats ---
+
+app.get('/api/admin/stats', standardLimiter, requireAuth, requireAdmin, (_req, res) => {
+  res.json(getUserStats());
 });
 
 // --- Audit Log ---

@@ -27,7 +27,7 @@ export interface PreAuth {
 const agents = new Map<string, AgentConnection>();
 
 let onAgentMessage: (agentId: string, msg: AgentMessage) => void = () => {};
-let onAgentDisconnect: (agentId: string) => void = () => {};
+let onAgentDisconnect: (agentId: string, tokenHash: string) => void = () => {};
 
 export function setAgentMessageHandler(handler: typeof onAgentMessage) {
   onAgentMessage = handler;
@@ -142,11 +142,12 @@ export function handleAgentConnection(ws: WebSocket, preAuth: PreAuth) {
       // Only clean up if this WebSocket is still the active connection.
       // If a newer connection replaced us, current.ws !== ws.
       if (current && current.ws === ws) {
+        const tokenHash = current.token;
         console.log(`Agent disconnected: ${agentId}`);
         audit('agent_disconnect', undefined, `agentId=${agentId}, name=${current.name}`);
         setAgentOnline(agentId, false);
         agents.delete(agentId);
-        onAgentDisconnect(agentId);
+        onAgentDisconnect(agentId, tokenHash);
       } else {
         console.log(`Stale connection closed for agent ${agentId} (already replaced)`);
       }

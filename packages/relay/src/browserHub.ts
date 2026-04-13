@@ -5,6 +5,8 @@ import { BrowserMessage, parseMessage } from './protocol.js';
 export interface BrowserConnection {
   id: string;
   ws: WebSocket;
+  username: string;
+  userId: number;
   subscribedSessions: Set<string>;
 }
 
@@ -24,7 +26,7 @@ export function setBrowserDisconnectHandler(handler: typeof onBrowserDisconnect)
 const MAX_BROWSER_MSG_SIZE = 64 * 1024; // 64KB (browser sends keystrokes, not large data)
 const MAX_BROWSER_CONNECTIONS = 100;
 
-export function handleBrowserConnection(ws: WebSocket) {
+export function handleBrowserConnection(ws: WebSocket, userInfo: { username: string; userId: number }) {
   if (browsers.size >= MAX_BROWSER_CONNECTIONS) {
     console.error('Max browser connections reached, rejecting new connection');
     ws.close(1013, 'Too many connections');
@@ -35,6 +37,8 @@ export function handleBrowserConnection(ws: WebSocket) {
   const conn: BrowserConnection = {
     id: browserId,
     ws,
+    username: userInfo.username,
+    userId: userInfo.userId,
     subscribedSessions: new Set(),
   };
   browsers.set(browserId, conn);
@@ -80,11 +84,23 @@ export function sendToBrowser(browserId: string, msg: object) {
   }
 }
 
-export function broadcastToBrowsers(msg: object) {
+export function getBrowserUserId(browserId: string): number | undefined {
+  return browsers.get(browserId)?.userId;
+}
+
+export function broadcastToUserBrowsers(userId: number, msg: object) {
   const payload = JSON.stringify(msg);
   for (const browser of browsers.values()) {
-    if (browser.ws.readyState === WebSocket.OPEN) {
+    if (browser.userId === userId && browser.ws.readyState === WebSocket.OPEN) {
       browser.ws.send(payload);
+    }
+  }
+}
+
+export function disconnectBrowsersByUserId(userId: number): void {
+  for (const [, conn] of browsers) {
+    if (conn.userId === userId) {
+      conn.ws.close(4002, 'User deleted');
     }
   }
 }

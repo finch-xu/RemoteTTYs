@@ -71,6 +71,15 @@ export function initDB() {
   try { db.exec("ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'"); } catch {}
   try { db.exec("ALTER TABLE agents ADD COLUMN fingerprint TEXT"); } catch {}
   try { db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'"); } catch {}
+  try { db.exec("ALTER TABLE agent_tokens ADD COLUMN user_id INTEGER REFERENCES users(id)"); } catch {}
+
+  // Backfill: assign orphaned tokens (user_id IS NULL) to the first admin user
+  const firstAdmin = db.prepare("SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1").get() as { id: number } | undefined;
+  if (firstAdmin) {
+    db.prepare('UPDATE agent_tokens SET user_id = ? WHERE user_id IS NULL').run(firstAdmin.id);
+  }
+
+  try { db.exec('CREATE INDEX idx_agent_tokens_user_id ON agent_tokens(user_id)'); } catch {}
 
   console.log(`Database: ${dbPath}`);
 }
@@ -95,9 +104,24 @@ export function createUser(username: string, password: string, role: string = 'u
   db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').run(username, hash, role);
 }
 
-export function deleteUser(username: string): boolean {
-  const result = db.prepare('DELETE FROM users WHERE username = ?').run(username);
-  return result.changes > 0;
+export function deleteUser(username: string): { deleted: boolean; userId?: number; tokenHashes: string[] } {
+  const user = getUser(username);
+  if (!user) return { deleted: false, tokenHashes: [] };
+
+  const tokens = db.prepare('SELECT token FROM agent_tokens WHERE user_id = ?').all(user.id) as { token: string }[];
+  const tokenHashes = tokens.map(t => t.token);
+
+  const tx = db.transaction(() => {
+    if (tokenHashes.length > 0) {
+      const placeholders = tokenHashes.map(() => '?').join(',');
+      db.prepare(`DELETE FROM agents WHERE token IN (${placeholders})`).run(...tokenHashes);
+    }
+    db.prepare('DELETE FROM agent_tokens WHERE user_id = ?').run(user.id);
+    db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
+  });
+  tx();
+
+  return { deleted: true, userId: user.id, tokenHashes };
 }
 
 export function listUsers() {
@@ -125,6 +149,32 @@ export function setUserPreferences(username: string, prefs: Record<string, unkno
   return result.changes > 0;
 }
 
+export interface UserStats {
+  username: string;
+  role: string;
+  tokenCount: number;
+  agentCount: number;
+  onlineAgentCount: number;
+  created_at: string;
+}
+
+export function getUserStats(): UserStats[] {
+  return db.prepare(`
+    SELECT
+      u.username,
+      u.role,
+      u.created_at,
+      COUNT(DISTINCT t.id) as tokenCount,
+      COUNT(DISTINCT a.id) as agentCount,
+      COALESCE(SUM(CASE WHEN a.online = 1 THEN 1 ELSE 0 END), 0) as onlineAgentCount
+    FROM users u
+    LEFT JOIN agent_tokens t ON t.user_id = u.id
+    LEFT JOIN agents a ON a.token = t.token
+    GROUP BY u.id
+    ORDER BY u.id
+  `).all() as UserStats[];
+}
+
 // --- Agent Tokens ---
 
 export interface TokenRow {
@@ -133,6 +183,7 @@ export interface TokenRow {
   label: string;
   notes: string;
   enabled: number;
+  user_id: number;
   created_at: string;
 }
 
@@ -144,8 +195,8 @@ export function getAgentTokenById(id: number): TokenRow | undefined {
   return db.prepare('SELECT * FROM agent_tokens WHERE id = ?').get(id) as TokenRow | undefined;
 }
 
-export function createAgentToken(token: string, label: string, notes: string) {
-  db.prepare('INSERT INTO agent_tokens (token, label, notes) VALUES (?, ?, ?)').run(token, label, notes);
+export function createAgentToken(token: string, label: string, notes: string, userId: number) {
+  db.prepare('INSERT INTO agent_tokens (token, label, notes, user_id) VALUES (?, ?, ?, ?)').run(token, label, notes, userId);
 }
 
 export function deleteAgentToken(token: string): boolean {
@@ -153,13 +204,27 @@ export function deleteAgentToken(token: string): boolean {
   return result.changes > 0;
 }
 
-export function listAgentTokens(): TokenRow[] {
-  return db.prepare('SELECT id, token, label, notes, enabled, created_at FROM agent_tokens ORDER BY id').all() as TokenRow[];
-}
-
 export function hasAgentTokens(): boolean {
   const count = db.prepare('SELECT COUNT(*) as n FROM agent_tokens').get() as { n: number };
   return count.n > 0;
+}
+
+export function listAgentTokensByUser(userId: number): TokenRow[] {
+  return db.prepare('SELECT id, token, label, notes, enabled, user_id, created_at FROM agent_tokens WHERE user_id = ? ORDER BY id').all(userId) as TokenRow[];
+}
+
+export function isTokenOwnedByUser(tokenId: number, userId: number): boolean {
+  const row = db.prepare('SELECT 1 FROM agent_tokens WHERE id = ? AND user_id = ?').get(tokenId, userId);
+  return !!row;
+}
+
+export function isTokenHashOwnedByUser(tokenHash: string, userId: number): boolean {
+  return getTokenOwner(tokenHash) === userId;
+}
+
+export function getTokenOwner(tokenHash: string): number | undefined {
+  const row = db.prepare('SELECT user_id FROM agent_tokens WHERE token = ?').get(tokenHash) as { user_id: number } | undefined;
+  return row?.user_id;
 }
 
 export function setAgentTokenEnabled(id: number, enabled: boolean): boolean {
@@ -204,13 +269,27 @@ export function setAgentOnline(id: string, online: boolean): void {
   db.prepare('UPDATE agents SET online = ?, last_seen = datetime(\'now\') WHERE id = ?').run(online ? 1 : 0, id);
 }
 
-export function listAgentsFromDB(): AgentRow[] {
-  return db.prepare('SELECT * FROM agents ORDER BY online DESC, last_seen DESC').all() as AgentRow[];
-}
-
 export function deleteAgentFromDB(id: string): boolean {
   const result = db.prepare('DELETE FROM agents WHERE id = ?').run(id);
   return result.changes > 0;
+}
+
+export function listAgentsByUser(userId: number): AgentRow[] {
+  return db.prepare(`
+    SELECT a.* FROM agents a
+    JOIN agent_tokens t ON a.token = t.token
+    WHERE t.user_id = ?
+    ORDER BY a.online DESC, a.last_seen DESC
+  `).all(userId) as AgentRow[];
+}
+
+export function isAgentOwnedByUser(agentId: string, userId: number): boolean {
+  const row = db.prepare(`
+    SELECT 1 FROM agents a
+    JOIN agent_tokens t ON a.token = t.token
+    WHERE a.id = ? AND t.user_id = ?
+  `).get(agentId, userId);
+  return !!row;
 }
 
 export function resetAllAgentsOffline(): void {

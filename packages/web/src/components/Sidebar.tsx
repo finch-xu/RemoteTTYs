@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, Sun, Moon, SunMoon, LogOut, ChevronLeft, ChevronRight, ScrollText } from 'lucide-react';
+import { Settings, Sun, Moon, SunMoon, LogOut, ChevronLeft, ChevronRight, ScrollText, Users } from 'lucide-react';
 import type { AgentInfo } from '../hooks/useAgentStore';
 import { useTheme } from '../hooks/useTheme';
 import { UI_FONT, MONO_FONT } from '../lib/theme';
@@ -13,9 +13,10 @@ interface SidebarProps {
   agents: AgentInfo[];
   selectedAgentId: string | null;
   onSelectAgent: (agentId: string) => void;
-  currentView: 'terminal' | 'settings' | 'audit';
-  onViewChange: (view: 'terminal' | 'settings' | 'audit') => void;
+  currentView: 'terminal' | 'settings' | 'audit' | 'users';
+  onViewChange: (view: 'terminal' | 'settings' | 'audit' | 'users') => void;
   onLogout: () => void;
+  userRole: string;
 }
 
 function getOsLabel(os: string): string {
@@ -44,7 +45,7 @@ const btnReset: React.CSSProperties = {
   font: 'inherit', cursor: 'pointer', textAlign: 'left' as const,
 };
 
-export function Sidebar({ agents, selectedAgentId, onSelectAgent, currentView, onViewChange, onLogout }: SidebarProps) {
+export function Sidebar({ agents, selectedAgentId, onSelectAgent, currentView, onViewChange, onLogout, userRole }: SidebarProps) {
   const { ui, uiMode, setUIMode } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -121,6 +122,19 @@ export function Sidebar({ agents, selectedAgentId, onSelectAgent, currentView, o
         ))}
       </div>
       <div style={{ borderTop: `1px solid ${ui.border}`, padding: '4px 0' }}>
+        {userRole === 'admin' && (
+          <button
+            style={itemStyle(currentView === 'users', hoveredId === '_users')}
+            onClick={() => onViewChange('users')}
+            onMouseEnter={() => setHoveredId('_users')}
+            onMouseLeave={() => setHoveredId(null)}
+            title={collapsed ? 'Users' : undefined}
+            aria-label={collapsed ? 'Users' : undefined}
+          >
+            <Users size={16} strokeWidth={ICON_STROKE} color={ui.textSecondary} />
+            {!collapsed && <span style={{ fontSize: 13, color: ui.textSecondary }}>Users</span>}
+          </button>
+        )}
         <button
           style={itemStyle(currentView === 'audit', hoveredId === '_audit')}
           onClick={() => onViewChange('audit')}

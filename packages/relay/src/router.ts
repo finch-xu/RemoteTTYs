@@ -12,10 +12,11 @@ import {
   PtyError,
 } from './protocol.js';
 import { getAgent, sendToAgent } from './agentHub.js';
-import { audit } from './db.js';
+import { audit, isAgentOwnedByUser, getTokenOwner } from './db.js';
 import {
   getBrowser,
-  broadcastToBrowsers,
+  getBrowserUserId,
+  broadcastToUserBrowsers,
   sendToSessionSubscribers,
 } from './browserHub.js';
 
@@ -59,13 +60,17 @@ export function handleAgentMessage(agentId: string, msg: AgentMessage) {
   switch (msg.type) {
     case 'agent.hello': {
       const hello = msg as AgentHello;
-      broadcastToBrowsers({
-        type: 'agent.online',
-        agentId,
-        name: hello.name,
-        os: hello.os,
-        identityKey: hello.identityKey || '',
-      });
+      const agent = getAgent(agentId);
+      const ownerId = agent ? getTokenOwner(agent.token) : undefined;
+      if (ownerId !== undefined) {
+        broadcastToUserBrowsers(ownerId, {
+          type: 'agent.online',
+          agentId,
+          name: hello.name,
+          os: hello.os,
+          identityKey: hello.identityKey || '',
+        });
+      }
       break;
     }
 
@@ -156,6 +161,13 @@ export function handleBrowserMessage(browserId: string, msg: BrowserMessage) {
         return;
       }
 
+      // Ownership check: only allow session creation on agents the user owns
+      const userId = getBrowserUserId(browserId);
+      if (userId === undefined || !isAgentOwnedByUser(m.agentId, userId)) {
+        console.error(`Browser ${browserId} denied session on agent ${m.agentId}: not owned`);
+        return;
+      }
+
       // Validate shell: only allow simple paths, no arguments or special characters
       const shell = m.shell ?? '';
       if (shell && /[;&|$`\\'"(){}\[\]<>!#~\s]/.test(shell)) {
@@ -219,8 +231,9 @@ export function handleBrowserMessage(browserId: string, msg: BrowserMessage) {
         publicKey: m.publicKey,
       });
 
+      const browserConn = getBrowser(browserId);
       console.log(`Session ${sessionId} created on agent ${m.agentId} by browser ${browserId}`);
-      audit('session_create', undefined, `sessionId=${sessionId}, agentId=${m.agentId}`);
+      audit('session_create', browserConn?.username, `sessionId=${sessionId}, agentId=${m.agentId}`);
       break;
     }
 
@@ -299,11 +312,14 @@ export function handleBrowserDisconnect(browserId: string) {
   }
 }
 
-export function handleAgentDisconnect(agentId: string) {
-  broadcastToBrowsers({
-    type: 'agent.offline',
-    agentId,
-  });
+export function handleAgentDisconnect(agentId: string, tokenHash: string) {
+  const ownerId = getTokenOwner(tokenHash);
+  if (ownerId !== undefined) {
+    broadcastToUserBrowsers(ownerId, {
+      type: 'agent.offline',
+      agentId,
+    });
+  }
 
   // Clean up sessions belonging to this agent
   for (const [sessionId, mapping] of sessions.entries()) {

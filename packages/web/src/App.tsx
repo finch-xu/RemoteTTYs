@@ -9,12 +9,13 @@ import { LoginPage } from './components/LoginPage';
 import { SetupPage } from './components/SetupPage';
 import { SettingsPage } from './components/SettingsPage';
 import { AuditLogPage } from './components/AuditLogPage';
+import { UserManagementPage } from './components/UserManagementPage';
 import { FingerprintWarning } from './components/FingerprintWarning';
 import { checkAgentIdentity, acceptNewIdentity } from './lib/knownAgents';
 import type { TOFUResult } from './lib/knownAgents';
 import { UI_FONT } from './lib/theme';
 
-type AppView = 'terminal' | 'settings' | 'audit';
+type AppView = 'terminal' | 'settings' | 'audit' | 'users';
 type AuthState = 'loading' | 'authenticated' | 'unauthenticated';
 
 interface Preferences {
@@ -182,7 +183,7 @@ function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLog
     setFingerprintWarning(null);
   }, []);
 
-  if (!connected && view !== 'settings' && view !== 'audit') {
+  if (!connected && view !== 'settings' && view !== 'audit' && view !== 'users') {
     return (
       <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary }}>
         <div className="spinner" /> Connecting to relay...
@@ -199,10 +200,13 @@ function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLog
         currentView={view}
         onViewChange={setView}
         onLogout={onLogout}
+        userRole={userInfo?.role ?? 'user'}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {view === 'settings' ? (
           <SettingsPage onAgentDeleted={fetchAgents} />
+        ) : view === 'users' ? (
+          <UserManagementPage />
         ) : view === 'audit' ? (
           <AuditLogPage userRole={userInfo?.role ?? 'user'} />
         ) : agents.length === 0 ? (
