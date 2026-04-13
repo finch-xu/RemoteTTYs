@@ -9,9 +9,9 @@
 [![Node.js](https://img.shields.io/badge/Node.js-24+-339933?logo=node.js&logoColor=white)](packages/relay/package.json)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](packages/web/package.json)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
-[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-lightgrey)]()
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)]()
 
-Remotely access the terminal on your home Mac from a browser, no NAT traversal needed. Run Claude Code, Codex, vim, or any CLI tool and command directly.
+Remotely access the terminal on your home PC/Mac from a browser, no NAT traversal needed. Run Claude Code, Codex, vim, or any CLI tool and command directly.
 
 > ⚠️ **Warning**: This project is for personal use and experimentation only — do NOT deploy it in production environments. You are solely responsible for securing your own data and connections. When exposing the relay to the public internet, always use a reverse proxy with HTTPS (e.g. [Caddy](https://caddyserver.com/)) to encrypt all traffic.
 
@@ -46,11 +46,11 @@ Local Machine(s)              Remote Server                Browser(s)
 
 ## Features
 
+- No NAT traversal, no remote desktop, no remote AI tool — just remote your terminal
+- macOS, Linux, Windows full platform support
 - Multiple machines in one dashboard with online/offline status
-- Multiple terminal sessions per machine with tabs
 - Scrollback replay on browser reconnect (1MB buffer per session)
 - Multi-user authentication with JWT (httpOnly cookie + CSRF protection)
-- Agent token management for machine authorization
 - End-to-end encryption (ECDH P-256 + AES-256-GCM) — relay cannot read terminal content
 - Ed25519 challenge-response for server identity verification
 - Agent identity keys with TOFU (SSH-like trust model) for MITM protection
@@ -112,11 +112,16 @@ Go to the [Releases](https://github.com/finchxu/RemoteTTYs/releases) page and do
 | macOS (Intel) | `rttys-agent-macOS-x64` |
 | Linux (x86_64) | `rttys-agent-Linux-x64` |
 | Linux (ARM64) | `rttys-agent-Linux-arm64` |
+| Windows (x86_64) | `rttys-agent-Windows-x64.exe` |
+
+**macOS / Linux:**
 
 ```bash
 chmod +x rttys-agent-*
 mv rttys-agent-* rttys-agent
 ```
+
+**Windows:** No extra steps — run the `.exe` directly.
 
 ### 2. Configure
 

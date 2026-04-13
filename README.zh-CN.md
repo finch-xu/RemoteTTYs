@@ -9,9 +9,9 @@
 [![Node.js](https://img.shields.io/badge/Node.js-24+-339933?logo=node.js&logoColor=white)](packages/relay/package.json)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](packages/web/package.json)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
-[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-lightgrey)]()
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)]()
 
-在浏览器中远程访问自己家里Mac的终端，无需 NAT 穿透。直接运行 Claude Code、Codex、vim 等任何 CLI 工具和命令。
+在浏览器中远程访问自己家里PC/Mac的终端，无需 NAT 穿透。直接运行 Claude Code、Codex、vim 等任何 CLI 工具和命令。
 
 > ⚠️ **警告**：本项目仅供个人使用和实验用途，请勿部署到生产环境。使用过程中请自行保障数据和连接的安全。在公网环境下，务必通过 HTTPS 反向代理（如 [Caddy](https://caddyserver.com/)）来加密所有通信流量。
 
@@ -46,12 +46,12 @@
 
 ## 功能特性
 
+- 不内网映射、不远程桌面、不远程某个AI工具，只远程你电脑的终端
+- macos、Linux、windows全平台终端支持
 - 多台机器统一管理，实时在线/离线状态
-- 每台机器支持多个终端会话，标签页切换
 - 浏览器重连时自动回放 scrollback（每会话 1MB 缓冲区）
 - 多用户认证（JWT httpOnly cookie + CSRF 防护）
-- Agent token 管理，授权机器接入
-- 端到端加密（ECDH P-256 + AES-256-GCM）— Relay 无法读取终端内容
+- 端到端加密（ECDH P-256 + AES-256-GCM）— 服务端不读取终端内容
 - Ed25519 challenge-response 服务端身份验证
 - Agent 身份密钥 + TOFU 信任模型（类似 SSH）防中间人攻击
 - 机器指纹绑定，防止 token 跨机器使用
@@ -112,11 +112,16 @@ Agent 是一个单文件 Go 二进制，运行在你的本地机器上。
 | macOS (Intel) | `rttys-agent-macOS-x64` |
 | Linux (x86_64) | `rttys-agent-Linux-x64` |
 | Linux (ARM64) | `rttys-agent-Linux-arm64` |
+| Windows (x86_64) | `rttys-agent-Windows-x64.exe` |
+
+**macOS / Linux：**
 
 ```bash
 chmod +x rttys-agent-*
 mv rttys-agent-* rttys-agent
 ```
+
+**Windows：** 无需额外步骤，直接运行 `.exe` 即可。
 
 ### 2. 配置
 
