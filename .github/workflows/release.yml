@@ -108,7 +108,6 @@ jobs:
             --team-id "$APPLE_TEAM_ID" \
             --wait \
             --timeout 10m
-          xcrun stapler staple "$BINARY"
           rm -f "${BINARY}.zip"
 
       - name: Clean up keychain
