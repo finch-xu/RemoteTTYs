@@ -12,6 +12,7 @@ jobs:
   build-agent:
     name: Build Agent (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
+    environment: APPLE_CERTIFICATE
     strategy:
       matrix:
         include:
