@@ -101,14 +101,14 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           BINARY="rttys-agent-${{ matrix.name }}"
-          zip "${BINARY}.zip" "$BINARY"
+          ditto -c -k --keepParent "$BINARY" "${BINARY}.zip"
           xcrun notarytool submit "${BINARY}.zip" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait \
             --timeout 10m
-          rm -f "${BINARY}.zip"
+          rm -f "$BINARY"
 
       - name: Clean up keychain
         if: matrix.goos == 'darwin' && always()
