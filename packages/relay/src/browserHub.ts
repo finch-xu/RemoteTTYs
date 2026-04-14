@@ -118,3 +118,9 @@ export function sendToSessionSubscribers(sessionId: string, msg: object) {
     }
   }
 }
+
+export function unsubscribeAllFromSession(sessionId: string) {
+  for (const browser of browsers.values()) {
+    browser.subscribedSessions.delete(sessionId);
+  }
+}

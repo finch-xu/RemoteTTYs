@@ -288,11 +288,18 @@ export interface RelayFileTransferComplete extends BaseMessage {
   payload: string;
 }
 
+export interface RelayPtyCreateError extends BaseMessage {
+  type: 'pty.create.error';
+  agentId: string;
+  error: string;
+}
+
 export type RelayToBrowserMessage =
   | RelayAgentOnline
   | RelayAgentOffline
   | RelayAgentSessions
   | RelayPtyCreated
+  | RelayPtyCreateError
   | RelayPtyData
   | RelayPtyExited
   | RelayPtyReplay

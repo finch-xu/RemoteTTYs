@@ -67,6 +67,12 @@ export interface AgentLatency extends BaseMessage {
   latencyMs: number | null;
 }
 
+export interface PtyCreateError extends BaseMessage {
+  type: 'pty.create.error';
+  agentId: string;
+  error: string;
+}
+
 // File transfer: Relay → Browser
 
 export interface FileTransferAck extends BaseMessage {
@@ -93,7 +99,7 @@ export interface FileTransferComplete extends BaseMessage {
   payload: string;
 }
 
-export type RelayMessage = AgentOnline | AgentOffline | PtyCreated | PtyData | PtyExited | PtyReplay | AgentSessions | PtyError | AgentLatency | FileTransferAck | FileTransferProgress | FileTransferComplete;
+export type RelayMessage = AgentOnline | AgentOffline | PtyCreated | PtyCreateError | PtyData | PtyExited | PtyReplay | AgentSessions | PtyError | AgentLatency | FileTransferAck | FileTransferProgress | FileTransferComplete;
 
 // Browser → Relay messages
 export interface BrowserPtyCreate extends BaseMessage {

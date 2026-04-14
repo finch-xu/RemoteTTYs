@@ -22,8 +22,10 @@ import { audit, isAgentOwnedByUser, getTokenOwner } from './db.js';
 import {
   getBrowser,
   getBrowserUserId,
+  sendToBrowser,
   broadcastToUserBrowsers,
   sendToSessionSubscribers,
+  unsubscribeAllFromSession,
 } from './browserHub.js';
 
 interface SessionMapping {
@@ -48,6 +50,7 @@ function destroySession(sessionId: string, agentId: string, auditDetail: string,
     agent.sessions.delete(sessionId);
   }
   sessions.delete(sessionId);
+  unsubscribeAllFromSession(sessionId);
   audit('session_close', undefined, auditDetail);
 }
 
@@ -178,9 +181,13 @@ export function handleBrowserMessage(browserId: string, msg: BrowserMessage) {
   switch (msg.type) {
     case 'pty.create': {
       const m = msg as BrowserPtyCreate;
+      const createError = (error: string) => {
+        sendToBrowser(browserId, { type: 'pty.create.error', agentId: m.agentId, error });
+      };
       const agent = getAgent(m.agentId);
       if (!agent) {
         console.error(`Browser ${browserId} requested session on unknown agent ${m.agentId}`);
+        createError('Agent not found or offline');
         return;
       }
 
@@ -188,6 +195,7 @@ export function handleBrowserMessage(browserId: string, msg: BrowserMessage) {
       const userId = getBrowserUserId(browserId);
       if (userId === undefined || !isAgentOwnedByUser(m.agentId, userId)) {
         console.error(`Browser ${browserId} denied session on agent ${m.agentId}: not owned`);
+        createError('Permission denied');
         return;
       }
 
@@ -195,6 +203,7 @@ export function handleBrowserMessage(browserId: string, msg: BrowserMessage) {
       const shell = m.shell ?? '';
       if (shell && /[;&|$`\\'"(){}\[\]<>!#~\s]/.test(shell)) {
         console.error(`Browser ${browserId} sent invalid shell: ${shell}`);
+        createError('Invalid shell path');
         return;
       }
 
@@ -202,12 +211,14 @@ export function handleBrowserMessage(browserId: string, msg: BrowserMessage) {
       const cwd = m.cwd ?? '';
       if (cwd && /\0/.test(cwd)) {
         console.error(`Browser ${browserId} sent invalid cwd: ${cwd}`);
+        createError('Invalid working directory');
         return;
       }
 
       // Check session limits
       if (sessions.size >= MAX_SESSIONS) {
         console.error(`Max total sessions (${MAX_SESSIONS}) reached, rejecting request`);
+        createError('Maximum total sessions reached');
         return;
       }
       let agentSessionCount = 0;
@@ -218,10 +229,12 @@ export function handleBrowserMessage(browserId: string, msg: BrowserMessage) {
       }
       if (agentSessionCount >= MAX_SESSIONS_PER_AGENT) {
         console.error(`Max sessions per agent (${MAX_SESSIONS_PER_AGENT}) reached for ${m.agentId}`);
+        createError('Maximum sessions for this agent reached');
         return;
       }
       if (browserSessionCount >= MAX_SESSIONS_PER_BROWSER) {
         console.error(`Max sessions per browser (${MAX_SESSIONS_PER_BROWSER}) reached for ${browserId}`);
+        createError('Maximum sessions per browser reached');
         return;
       }
 
@@ -362,6 +375,7 @@ export function handleAgentDisconnect(agentId: string, tokenHash: string) {
   // Clean up sessions belonging to this agent
   for (const [sessionId, mapping] of sessions.entries()) {
     if (mapping.agentId === agentId) {
+      unsubscribeAllFromSession(sessionId);
       sessions.delete(sessionId);
     }
   }

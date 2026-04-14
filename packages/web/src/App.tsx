@@ -148,6 +148,13 @@ function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLog
   const drawerMode = !isDesktop;
   // Track which agent IDs we've already checked to avoid re-checking on every render
   const checkedAgentsRef = useRef<Set<string>>(new Set());
+  // Track agents that have been online — once mounted, keep TerminalTabs mounted
+  const mountedAgentIdsRef = useRef<Set<string>>(new Set());
+  for (const agent of agents) {
+    if (agent.online) {
+      mountedAgentIdsRef.current.add(agent.id);
+    }
+  }
 
   // TOFU: check agent identity when agent.online is received with identityKey
   useEffect(() => {
@@ -280,21 +287,27 @@ function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLog
             </div>
           </div>
         ) : null}
-        {selectedAgent && (
-          <div style={{ flex: 1, display: view === 'terminal' && selectedAgent.online ? 'flex' : 'none', flexDirection: 'column' }}>
+        {agents.filter(a => mountedAgentIdsRef.current.has(a.id)).map(agent => (
+          <div
+            key={agent.id}
+            style={{
+              flex: 1,
+              display: view === 'terminal' && agent.id === selectedAgentId && agent.online ? 'flex' : 'none',
+              flexDirection: 'column',
+            }}
+          >
             <TerminalTabs
-              key={selectedAgent.id}
-              agentId={selectedAgent.id}
-              agentName={selectedAgent.name}
-              identityKey={selectedAgent.identityKey}
-              existingSessions={selectedAgent.sessions}
-              clipboardAvailable={selectedAgent.capabilities.includes('clipboard')}
+              agentId={agent.id}
+              agentName={agent.name}
+              identityKey={agent.identityKey}
+              existingSessions={agent.sessions}
+              clipboardAvailable={agent.capabilities.includes('clipboard')}
               send={send}
               subscribe={subscribe}
               compact={drawerMode}
             />
           </div>
-        )}
+        ))}
       </div>
       {fingerprintWarning && (
         <FingerprintWarning

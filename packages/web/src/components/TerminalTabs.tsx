@@ -6,7 +6,7 @@ import { useTheme } from '../hooks/useTheme';
 import { MONO_FONT } from '../lib/theme';
 import { generateECDHKeyPair, exportPublicKeyRaw, uint8ToBase64, computeCloseHMAC } from '../lib/e2e';
 import type { E2EKeyPairData } from '../lib/e2e';
-import type { PtyCreated, PtyExited } from '../lib/protocol';
+import type { PtyCreated, PtyExited, PtyCreateError, AgentOffline } from '../lib/protocol';
 
 interface SessionInfo {
   sessionId: string;
@@ -40,6 +40,7 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [split, setSplit] = useState<SplitState | null>(null);
   const [focusedPane, setFocusedPane] = useState<'left' | 'right'>('left');
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const terminalAreaRef = useRef<HTMLDivElement>(null);
   const splitRef = useRef(split);
@@ -117,6 +118,58 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
       setSessions(prev => prev.map(s => s.sessionId === msg.sessionId ? { ...s, exited: true } : s));
     });
     return unsub;
+  }, [subscribe, agentId]);
+
+  // When agent goes offline, mark all sessions as exited (relay destroys them)
+  useEffect(() => {
+    const unsub = subscribe('agent.offline', (msg: AgentOffline) => {
+      if (msg.agentId !== agentId) return;
+      setSessions(prev => prev.map(s => s.exited ? s : { ...s, exited: true }));
+    });
+    return unsub;
+  }, [subscribe, agentId]);
+
+  // Handle agent reconnect: pick up new sessions from existingSessions prop
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      return; // Skip first run — handled by mount effect
+    }
+    if (existingSessions.length === 0) return;
+    setSessions(prev => {
+      const currentIds = new Set(prev.map(s => s.sessionId));
+      const newSessions = existingSessions.filter(sid => !currentIds.has(sid));
+      if (newSessions.length === 0) return prev;
+      return [
+        ...prev,
+        ...newSessions.map((sid, i) => ({
+          sessionId: sid,
+          label: `Terminal ${prev.length + i + 1}`,
+          exited: false,
+          isExisting: true,
+        })),
+      ];
+    });
+    if (!activeSessionId) {
+      setActiveSessionId(existingSessions[0]);
+    }
+  }, [existingSessions]);
+
+  // Handle pty.create failures: discard orphaned key pair and show error
+  const createErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const unsub = subscribe('pty.create.error', (msg: PtyCreateError) => {
+      if (msg.agentId !== agentId) return;
+      pendingKeyPairsRef.current.shift();
+      setCreateError(msg.error);
+      if (createErrorTimerRef.current) clearTimeout(createErrorTimerRef.current);
+      createErrorTimerRef.current = setTimeout(() => setCreateError(null), 5000);
+    });
+    return () => {
+      unsub();
+      if (createErrorTimerRef.current) clearTimeout(createErrorTimerRef.current);
+    };
   }, [subscribe, agentId]);
 
   // Clean up drag listeners on unmount
@@ -352,6 +405,15 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
       </div>
 
       <div ref={terminalAreaRef} style={{ flex: 1, position: 'relative' }}>
+        {createError && (
+          <div style={{
+            position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 20,
+            padding: '6px 16px', borderRadius: 6, fontSize: 13, fontFamily: MONO_FONT,
+            background: ui.error, color: '#fff', whiteSpace: 'nowrap',
+          }}>
+            {createError}
+          </div>
+        )}
         {sessions.map(s => (
           <div
             key={s.sessionId}
