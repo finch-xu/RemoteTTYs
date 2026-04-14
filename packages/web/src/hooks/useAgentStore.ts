@@ -11,6 +11,7 @@ export interface AgentInfo {
   lastSeen: string | null;
   identityKey: string | null;
   latencyMs: number | null;
+  capabilities: string[];
 }
 
 interface ApiAgent {
@@ -50,6 +51,7 @@ export function useAgentStore(
           // WebSocket-delivered value, then null
           identityKey: a.identityKey || prevMap.get(a.id)?.identityKey || null,
           latencyMs: a.latencyMs ?? prevMap.get(a.id)?.latencyMs ?? null,
+          capabilities: prevMap.get(a.id)?.capabilities ?? [],
         }));
       });
     } catch {
@@ -67,12 +69,13 @@ export function useAgentStore(
   // Re-fetch on WebSocket agent status changes and capture identityKey
   useEffect(() => {
     const unsubOnline = subscribe('agent.online', (msg: AgentOnline) => {
-      if (msg.identityKey) {
-        // Patch identityKey immediately so it's available before fetchAgents completes
-        setAgents(prev => prev.map(a =>
-          a.id === msg.agentId ? { ...a, identityKey: msg.identityKey } : a
-        ));
-      }
+      setAgents(prev => prev.map(a =>
+        a.id === msg.agentId ? {
+          ...a,
+          ...(msg.identityKey && { identityKey: msg.identityKey }),
+          capabilities: msg.capabilities ?? [],
+        } : a
+      ));
       fetchAgents();
     });
     const unsubOffline = subscribe('agent.offline', () => { fetchAgents(); });

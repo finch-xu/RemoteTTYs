@@ -30,6 +30,7 @@ type Client struct {
 	serverPubKey ed25519.PublicKey
 	fingerprint  string
 	identity     *Identity
+	hasClipboard bool
 }
 
 func NewClient(config *Config, identity *Identity) *Client {
@@ -55,6 +56,7 @@ func NewClient(config *Config, identity *Identity) *Client {
 		serverPubKey: ed25519.PublicKey(pubKeyBytes),
 		fingerprint:  fp,
 		identity:     identity,
+		hasClipboard: DetectClipboard(),
 	}
 }
 
@@ -89,12 +91,18 @@ func (c *Client) Connect() error {
 		return fmt.Errorf("server verification failed: %w", err)
 	}
 
+	var caps []string
+	if c.hasClipboard {
+		caps = append(caps, "clipboard")
+	}
+
 	hello := AgentHelloMsg{
-		Type:        "agent.hello",
-		Name:        c.config.Name,
-		OS:          runtime.GOOS,
-		Fingerprint: c.fingerprint,
-		IdentityKey: c.identity.PublicKeyBase64(),
+		Type:         "agent.hello",
+		Name:         c.config.Name,
+		OS:           runtime.GOOS,
+		Fingerprint:  c.fingerprint,
+		IdentityKey:  c.identity.PublicKeyBase64(),
+		Capabilities: caps,
 	}
 	c.Send(hello)
 
@@ -220,6 +228,12 @@ func (c *Client) readLoop() {
 			c.handlePtyClose(msg)
 		case "pty.replay.request":
 			c.handlePtyReplayRequest(msg)
+		case "file.transfer.start":
+			c.handleFileTransferStart(msg)
+		case "file.transfer.chunk":
+			c.handleFileTransferChunk(msg)
+		case "file.transfer.end":
+			c.handleFileTransferEnd(msg)
 		case "agent.ping":
 			c.Send(AgentPongMsg{
 				Type:      "agent.pong",

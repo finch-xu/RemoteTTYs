@@ -262,6 +262,7 @@ function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLog
               agentName={selectedAgent.name}
               identityKey={selectedAgent.identityKey}
               existingSessions={selectedAgent.sessions}
+              clipboardAvailable={selectedAgent.capabilities.includes('clipboard')}
               send={send}
               subscribe={subscribe}
             />

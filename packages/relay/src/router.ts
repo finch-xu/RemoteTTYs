@@ -8,8 +8,14 @@ import {
   BrowserPtyResize,
   BrowserPtyClose,
   BrowserPtyReplayRequest,
+  BrowserFileTransferStart,
+  BrowserFileTransferChunk,
+  BrowserFileTransferEnd,
   PtyReplay,
   PtyError,
+  FileTransferAck,
+  FileTransferProgress,
+  FileTransferComplete,
 } from './protocol.js';
 import { getAgent, sendToAgent } from './agentHub.js';
 import { audit, isAgentOwnedByUser, getTokenOwner } from './db.js';
@@ -69,6 +75,7 @@ export function handleAgentMessage(agentId: string, msg: AgentMessage) {
           name: hello.name,
           os: hello.os,
           identityKey: hello.identityKey || '',
+          ...(hello.capabilities && { capabilities: hello.capabilities }),
         });
       }
       break;
@@ -145,6 +152,22 @@ export function handleAgentMessage(agentId: string, msg: AgentMessage) {
         agentId,
         sessionId: m.sessionId,
         error: m.error,
+      });
+      break;
+    }
+
+    case 'file.transfer.ack':
+    case 'file.transfer.progress':
+    case 'file.transfer.complete': {
+      const m = msg as FileTransferAck | FileTransferProgress | FileTransferComplete;
+      const ftMapping = sessions.get(m.sessionId);
+      if (!ftMapping || ftMapping.agentId !== agentId) break;
+      sendToSessionSubscribers(m.sessionId, {
+        type: m.type,
+        agentId,
+        sessionId: m.sessionId,
+        transferId: m.transferId,
+        payload: m.payload,
       });
       break;
     }
@@ -297,6 +320,21 @@ export function handleBrowserMessage(browserId: string, msg: BrowserMessage) {
         type: 'pty.replay.request',
         sessionId: m.sessionId,
       });
+      break;
+    }
+
+    case 'file.transfer.start':
+    case 'file.transfer.chunk':
+    case 'file.transfer.end': {
+      const m = msg as BrowserFileTransferStart | BrowserFileTransferChunk | BrowserFileTransferEnd;
+      const ftSession = sessions.get(m.sessionId);
+      if (!ftSession || ftSession.agentId !== m.agentId || !ftSession.browserIds.has(browserId)) {
+        return;
+      }
+      ftSession.lastActivity = Date.now();
+      // Forward to agent, stripping agentId. Spread preserves chunkIndex when present.
+      const { agentId: _aid, ...rest } = m;
+      sendToAgent(m.agentId, rest);
       break;
     }
   }

@@ -11,6 +11,7 @@ export interface AgentHello extends BaseMessage {
   os: string;
   fingerprint: string;
   identityKey: string; // Ed25519 public key (base64)
+  capabilities?: string[]; // e.g. ["clipboard"]
 }
 
 export interface AgentHeartbeat extends BaseMessage {
@@ -55,7 +56,30 @@ export interface PtyError extends BaseMessage {
   error: string;
 }
 
-export type AgentMessage = AgentHello | AgentHeartbeat | AgentPong | PtyCreated | PtyData | PtyExited | PtyReplay | PtyError;
+// File transfer: Agent → Relay (→ Browser)
+
+export interface FileTransferAck extends BaseMessage {
+  type: 'file.transfer.ack';
+  sessionId: string;
+  transferId: string;
+  payload: string;
+}
+
+export interface FileTransferProgress extends BaseMessage {
+  type: 'file.transfer.progress';
+  sessionId: string;
+  transferId: string;
+  payload: string;
+}
+
+export interface FileTransferComplete extends BaseMessage {
+  type: 'file.transfer.complete';
+  sessionId: string;
+  transferId: string;
+  payload: string;
+}
+
+export type AgentMessage = AgentHello | AgentHeartbeat | AgentPong | PtyCreated | PtyData | PtyExited | PtyReplay | PtyError | FileTransferAck | FileTransferProgress | FileTransferComplete;
 
 // --- Relay → Agent (auth) ---
 
@@ -140,7 +164,34 @@ export interface BrowserPtyReplayRequest extends BaseMessage {
   sessionId: string;
 }
 
-export type BrowserMessage = BrowserPtyCreate | BrowserPtyData | BrowserPtyResize | BrowserPtyClose | BrowserPtyReplayRequest;
+// File transfer: Browser → Relay (→ Agent)
+
+export interface BrowserFileTransferStart extends BaseMessage {
+  type: 'file.transfer.start';
+  agentId: string;
+  sessionId: string;
+  transferId: string;
+  payload: string;
+}
+
+export interface BrowserFileTransferChunk extends BaseMessage {
+  type: 'file.transfer.chunk';
+  agentId: string;
+  sessionId: string;
+  transferId: string;
+  chunkIndex: number;
+  payload: string;
+}
+
+export interface BrowserFileTransferEnd extends BaseMessage {
+  type: 'file.transfer.end';
+  agentId: string;
+  sessionId: string;
+  transferId: string;
+  payload: string;
+}
+
+export type BrowserMessage = BrowserPtyCreate | BrowserPtyData | BrowserPtyResize | BrowserPtyClose | BrowserPtyReplayRequest | BrowserFileTransferStart | BrowserFileTransferChunk | BrowserFileTransferEnd;
 
 // --- Relay → Browser ---
 
@@ -150,6 +201,7 @@ export interface RelayAgentOnline extends BaseMessage {
   name: string;
   os: string;
   identityKey: string;
+  capabilities?: string[];
 }
 
 export interface RelayAgentOffline extends BaseMessage {
@@ -210,6 +262,32 @@ export interface RelayAgentLatency extends BaseMessage {
   latencyMs: number | null;
 }
 
+// File transfer: Relay → Browser (forwarded from agent, with agentId added)
+
+export interface RelayFileTransferAck extends BaseMessage {
+  type: 'file.transfer.ack';
+  agentId: string;
+  sessionId: string;
+  transferId: string;
+  payload: string;
+}
+
+export interface RelayFileTransferProgress extends BaseMessage {
+  type: 'file.transfer.progress';
+  agentId: string;
+  sessionId: string;
+  transferId: string;
+  payload: string;
+}
+
+export interface RelayFileTransferComplete extends BaseMessage {
+  type: 'file.transfer.complete';
+  agentId: string;
+  sessionId: string;
+  transferId: string;
+  payload: string;
+}
+
 export type RelayToBrowserMessage =
   | RelayAgentOnline
   | RelayAgentOffline
@@ -219,7 +297,10 @@ export type RelayToBrowserMessage =
   | RelayPtyExited
   | RelayPtyReplay
   | RelayPtyError
-  | RelayAgentLatency;
+  | RelayAgentLatency
+  | RelayFileTransferAck
+  | RelayFileTransferProgress
+  | RelayFileTransferComplete;
 
 export function parseMessage(raw: string): BaseMessage {
   const msg = JSON.parse(raw);

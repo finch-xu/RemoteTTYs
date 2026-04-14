@@ -20,11 +20,12 @@ interface TerminalTabsProps {
   agentName: string;
   identityKey: string | null;
   existingSessions: string[];
+  clipboardAvailable: boolean;
   send: (msg: object) => void;
   subscribe: (type: string, handler: (msg: any) => void) => () => void;
 }
 
-export function TerminalTabs({ agentId, agentName, identityKey, existingSessions, send, subscribe }: TerminalTabsProps) {
+export function TerminalTabs({ agentId, agentName, identityKey, existingSessions, clipboardAvailable, send, subscribe }: TerminalTabsProps) {
   const { ui } = useTheme();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -163,7 +164,7 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
       <div style={{ flex: 1, position: 'relative' }}>
         {sessions.map(s => (
           <div key={s.sessionId} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: s.sessionId === activeSessionId ? 'block' : 'none' }}>
-            <TerminalView agentId={agentId} sessionId={s.sessionId} isExisting={s.isExisting} identityKey={identityKey} ecdhKeyPair={sessionKeyPairsRef.current.get(s.sessionId) ?? null} agentPublicKey={agentKeyExchangeRef.current.get(s.sessionId)?.publicKey ?? null} agentSignature={agentKeyExchangeRef.current.get(s.sessionId)?.signature ?? null} send={send} subscribe={subscribe} onE2EEstablished={handleE2EEstablished} />
+            <TerminalView agentId={agentId} sessionId={s.sessionId} isExisting={s.isExisting} identityKey={identityKey} ecdhKeyPair={sessionKeyPairsRef.current.get(s.sessionId) ?? null} agentPublicKey={agentKeyExchangeRef.current.get(s.sessionId)?.publicKey ?? null} agentSignature={agentKeyExchangeRef.current.get(s.sessionId)?.signature ?? null} clipboardAvailable={clipboardAvailable} send={send} subscribe={subscribe} onE2EEstablished={handleE2EEstablished} />
           </div>
         ))}
       </div>

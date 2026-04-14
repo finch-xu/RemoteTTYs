@@ -1,6 +1,7 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { init, Terminal, FitAddon } from 'ghostty-web';
 import { useTheme } from '../hooks/useTheme';
+import { UploadOverlay } from './UploadOverlay';
 import {
   importPublicKeyRaw,
   deriveSessionKeys,
@@ -14,7 +15,19 @@ import {
   DIRECTION_A2B,
 } from '../lib/e2e';
 import type { E2ESession, E2EKeyPairData } from '../lib/e2e';
-import type { PtyData, PtyExited, PtyReplay, PtyError } from '../lib/protocol';
+import type { PtyData, PtyExited, PtyReplay, PtyError, FileTransferComplete } from '../lib/protocol';
+
+const CHUNK_SIZE = 32 * 1024; // 32KB per chunk
+
+export interface UploadState {
+  transferId: string;
+  fileName: string;
+  totalSize: number;
+  totalChunks: number;
+  chunksSent: number;
+  status: 'sending' | 'waiting' | 'complete' | 'error';
+  error?: string;
+}
 
 interface TerminalViewProps {
   agentId: string;
@@ -24,16 +37,22 @@ interface TerminalViewProps {
   ecdhKeyPair: E2EKeyPairData | null;
   agentPublicKey: string | null;
   agentSignature: string | null;
+  clipboardAvailable: boolean;
   send: (msg: object) => void;
   subscribe: (type: string, handler: (msg: any) => void) => () => void;
   onE2EEstablished?: (sessionId: string, hmacKey: CryptoKey) => void;
 }
 
-export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdhKeyPair, agentPublicKey, agentSignature, send, subscribe, onE2EEstablished }: TerminalViewProps) {
+export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdhKeyPair, agentPublicKey, agentSignature, clipboardAvailable, send, subscribe, onE2EEstablished }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const e2eRef = useRef<E2ESession | null>(null);
-  const { terminalTheme, fontSize, fontFamily } = useTheme();
+  const { terminalTheme, fontSize, fontFamily, pasteImageTypes, pasteImageMaxSizeMB } = useTheme();
+  const [uploadState, setUploadState] = useState<UploadState | null>(null);
+  const [showNoClipboardToast, setShowNoClipboardToast] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const sendEncryptedDataRef = useRef<((data: string) => void) | null>(null);
+  const clipboardToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Update theme/font on existing terminal when settings change
   useEffect(() => {
@@ -77,10 +96,9 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
 
       // --- E2E helpers ---
 
-      async function encryptPayload(data: string): Promise<string> {
+      async function encryptAndEncode(plaintext: Uint8Array): Promise<string> {
         const session = e2eRef.current;
         if (!session) throw new Error('E2E session not established');
-        const plaintext = new TextEncoder().encode(data);
         const ct = await encrypt(session.keys.keyB2A, plaintext, DIRECTION_B2A, session.sendCounter);
         session.sendCounter++;
         return uint8ToBase64(ct);
@@ -95,17 +113,22 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
         return plaintext;
       }
 
+      const textEncoder = new TextEncoder();
+
       // Promise queue to serialize encrypted sends (prevents counter race on fast paste)
       let sendQueue = Promise.resolve();
-      async function sendEncryptedData(data: string) {
+      function queueEncryptedSend(plaintext: Uint8Array, msg: object) {
         sendQueue = sendQueue.then(async () => {
           try {
-            const payload = await encryptPayload(data);
-            send({ type: 'pty.data', agentId, sessionId, payload });
+            const payload = await encryptAndEncode(plaintext);
+            send({ ...msg, payload });
           } catch {
-            // E2E not yet established — drop input until key exchange completes
+            // E2E not yet established — drop until key exchange completes
           }
         });
+      }
+      async function sendEncryptedData(data: string) {
+        queueEncryptedSend(textEncoder.encode(data), { type: 'pty.data', agentId, sessionId });
       }
 
       /** Send pty.resize with HMAC if E2E is active. */
@@ -206,6 +229,114 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
       });
       cleanups.push(() => inputDisposable.dispose());
 
+      sendEncryptedDataRef.current = sendEncryptedData;
+      cleanups.push(() => { sendEncryptedDataRef.current = null; });
+
+      // --- Image paste/drop handling ---
+
+      async function startImageTransfer(file: File) {
+        if (!e2eRef.current) return;
+
+        const allowedTypes = pasteImageTypes ?? ['image/png', 'image/jpeg'];
+        if (!allowedTypes.includes(file.type)) return;
+
+        const maxSize = (pasteImageMaxSizeMB ?? 10) * 1024 * 1024;
+        if (file.size > maxSize) {
+          setUploadState({ transferId: '', fileName: file.name, totalSize: file.size, totalChunks: 0, chunksSent: 0, status: 'error', error: `Image too large (${(file.size / 1024 / 1024).toFixed(1)} MB), max ${pasteImageMaxSizeMB ?? 10} MB` });
+          return;
+        }
+
+        const buffer = new Uint8Array(await file.arrayBuffer());
+        const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+        const sha256 = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+        const transferId = crypto.randomUUID();
+        const totalChunks = Math.ceil(buffer.length / CHUNK_SIZE);
+        const fileName = file.name || 'image.png';
+
+        setUploadState({ transferId, fileName, totalSize: buffer.length, totalChunks, chunksSent: 0, status: 'sending' });
+
+        // Each message queued individually via queueEncryptedSend so keyboard input can interleave
+        queueEncryptedSend(
+          textEncoder.encode(JSON.stringify({ fileName, mimeType: file.type, totalSize: buffer.length, totalChunks, sha256 })),
+          { type: 'file.transfer.start', agentId, sessionId, transferId },
+        );
+
+        for (let i = 0; i < totalChunks; i++) {
+          const start = i * CHUNK_SIZE;
+          const chunk = buffer.slice(start, Math.min(start + CHUNK_SIZE, buffer.length));
+          const chunkIndex = i;
+          queueEncryptedSend(chunk, { type: 'file.transfer.chunk', agentId, sessionId, transferId, chunkIndex });
+          // Throttle progress updates to every 5 chunks or the last chunk
+          if ((i + 1) % 5 === 0 || i + 1 === totalChunks) {
+            sendQueue = sendQueue.then(() => {
+              setUploadState(prev => prev?.transferId === transferId ? { ...prev, chunksSent: chunkIndex + 1 } : prev);
+            });
+          }
+        }
+
+        queueEncryptedSend(
+          textEncoder.encode(JSON.stringify({ sha256 })),
+          { type: 'file.transfer.end', agentId, sessionId, transferId },
+        );
+        sendQueue = sendQueue.then(() => {
+          setUploadState(prev => prev?.transferId === transferId ? { ...prev, status: 'waiting' } : prev);
+        });
+      }
+
+      // Capture phase — intercept image pastes before ghostty-web's text paste handler
+      function handleImagePaste(event: ClipboardEvent) {
+        if (!event.clipboardData) return;
+        const items = event.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.startsWith('image/')) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!clipboardAvailable) {
+              if (clipboardToastTimerRef.current) clearTimeout(clipboardToastTimerRef.current);
+              setShowNoClipboardToast(true);
+              clipboardToastTimerRef.current = setTimeout(() => setShowNoClipboardToast(false), 3000);
+              return;
+            }
+            const file = items[i].getAsFile();
+            if (file) startImageTransfer(file);
+            return;
+          }
+        }
+      }
+
+      containerRef.current.addEventListener('paste', handleImagePaste, { capture: true });
+      cleanups.push(() => containerRef.current?.removeEventListener('paste', handleImagePaste, { capture: true }));
+
+      // Drag-and-drop handlers
+      function handleDragOver(event: DragEvent) {
+        if (event.dataTransfer?.types.includes('Files')) {
+          event.preventDefault();
+          setIsDragging(true);
+        }
+      }
+      function handleDragLeave() {
+        setIsDragging(false);
+      }
+      function handleDrop(event: DragEvent) {
+        event.preventDefault();
+        setIsDragging(false);
+        if (!clipboardAvailable || !event.dataTransfer?.files.length) return;
+        const file = event.dataTransfer.files[0];
+        if (file.type.startsWith('image/')) {
+          startImageTransfer(file);
+        }
+      }
+
+      containerRef.current.addEventListener('dragover', handleDragOver);
+      containerRef.current.addEventListener('dragleave', handleDragLeave);
+      containerRef.current.addEventListener('drop', handleDrop);
+      cleanups.push(() => {
+        containerRef.current?.removeEventListener('dragover', handleDragOver);
+        containerRef.current?.removeEventListener('dragleave', handleDragLeave);
+        containerRef.current?.removeEventListener('drop', handleDrop);
+      });
+
       // --- Incoming data ---
 
       cleanups.push(subscribe('pty.data', async (msg: PtyData) => {
@@ -241,6 +372,14 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
         }
       }));
 
+      cleanups.push(subscribe('file.transfer.complete', (msg: FileTransferComplete) => {
+        if (msg.sessionId !== sessionId) return;
+        setUploadState(prev => {
+          if (!prev || prev.transferId !== msg.transferId) return prev;
+          return { ...prev, status: 'complete' };
+        });
+      }));
+
       if (isExisting) {
         send({ type: 'pty.replay.request', agentId, sessionId });
       }
@@ -269,9 +408,30 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
     return () => {
       disposed = true;
       e2eRef.current = null;
+      if (clipboardToastTimerRef.current) clearTimeout(clipboardToastTimerRef.current);
       for (const fn of cleanups) fn();
     };
   }, [agentId, sessionId, agentPublicKey, agentSignature, send, subscribe]);
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%', overflow: 'hidden', background: terminalTheme.colors.background }} />;
+  const handleSendToTerminal = useCallback(() => {
+    sendEncryptedDataRef.current?.('\x16');
+    setUploadState(null);
+  }, []);
+
+  const handleDismissUpload = useCallback(() => {
+    setUploadState(null);
+  }, []);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div ref={containerRef} style={{ width: '100%', height: '100%', overflow: 'hidden', background: terminalTheme.colors.background }} />
+      <UploadOverlay
+        uploadState={uploadState}
+        isDragging={isDragging}
+        showNoClipboardToast={showNoClipboardToast}
+        onSendToTerminal={handleSendToTerminal}
+        onDismiss={handleDismissUpload}
+      />
+    </div>
+  );
 }

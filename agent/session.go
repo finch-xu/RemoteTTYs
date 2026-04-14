@@ -73,13 +73,21 @@ func validateCwd(cwd string) (string, error) {
 }
 
 type Session struct {
-	ID          string
-	pty         *PTYHandle
-	Scrollback  *RingBuffer
-	Keys        *SessionKeys
-	SendCounter uint64
-	RecvCounter uint64
-	CreatedAt   time.Time
+	ID               string
+	pty              *PTYHandle
+	Scrollback       *RingBuffer
+	Keys             *SessionKeys
+	SendCounter      uint64
+	RecvCounter      uint64
+	CreatedAt        time.Time
+	PendingTransfers map[string]*PendingTransfer
+}
+
+// sendCounterNext atomically increments SendCounter and returns the pre-increment value.
+// Atomic is required because readPTY (separate goroutine) also increments SendCounter.
+func (s *Session) sendCounterNext() uint64 {
+	v := atomic.AddUint64(&s.SendCounter, 1) - 1
+	return v
 }
 
 func (c *Client) handlePtyCreate(msg IncomingMessage) {
@@ -188,11 +196,12 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 	}()
 
 	sess := &Session{
-		ID:         msg.SessionID,
-		pty:        ptyHandle,
-		Scrollback: NewRingBuffer(maxScrollbackBytes),
-		Keys:       keys,
-		CreatedAt:  time.Now(),
+		ID:               msg.SessionID,
+		pty:              ptyHandle,
+		Scrollback:       NewRingBuffer(maxScrollbackBytes),
+		Keys:             keys,
+		CreatedAt:        time.Now(),
+		PendingTransfers: make(map[string]*PendingTransfer),
 	}
 
 	c.mu.Lock()

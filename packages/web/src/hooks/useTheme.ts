@@ -16,7 +16,14 @@ interface ThemeContextValue {
   setFontSize: (size: number) => void;
   fontFamily: string;
   setFontFamily: (family: string) => void;
+  pasteImageTypes: string[];
+  setPasteImageTypes: (types: string[]) => void;
+  pasteImageMaxSizeMB: number;
+  setPasteImageMaxSizeMB: (size: number) => void;
 }
+
+const DEFAULT_PASTE_IMAGE_TYPES = ['image/png', 'image/jpeg'];
+const DEFAULT_PASTE_IMAGE_MAX_SIZE_MB = 10;
 
 export const ThemeContext = createContext<ThemeContextValue>({
   ui: lightTheme,
@@ -29,6 +36,10 @@ export const ThemeContext = createContext<ThemeContextValue>({
   setFontSize: () => {},
   fontFamily: MONO_FONT,
   setFontFamily: () => {},
+  pasteImageTypes: DEFAULT_PASTE_IMAGE_TYPES,
+  setPasteImageTypes: () => {},
+  pasteImageMaxSizeMB: DEFAULT_PASTE_IMAGE_MAX_SIZE_MB,
+  setPasteImageMaxSizeMB: () => {},
 });
 
 export function useTheme() {
@@ -47,6 +58,8 @@ interface Preferences {
   terminalTheme?: string;
   fontSize?: number;
   fontFamily?: string;
+  pasteImageTypes?: string[];
+  pasteImageMaxSizeMB?: number;
 }
 
 export function useThemeProvider(initialPreferences?: Preferences) {
@@ -62,6 +75,12 @@ export function useThemeProvider(initialPreferences?: Preferences) {
   const [fontFamily, setFontFamilyState] = useState(
     initialPreferences?.fontFamily || MONO_FONT
   );
+  const [pasteImageTypes, setPasteImageTypesState] = useState<string[]>(
+    initialPreferences?.pasteImageTypes || DEFAULT_PASTE_IMAGE_TYPES
+  );
+  const [pasteImageMaxSizeMB, setPasteImageMaxSizeMBState] = useState(
+    initialPreferences?.pasteImageMaxSizeMB || DEFAULT_PASTE_IMAGE_MAX_SIZE_MB
+  );
   const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(resolveSystemTheme);
 
   // Sync state when preferences arrive after initial render (async fetch)
@@ -71,6 +90,8 @@ export function useThemeProvider(initialPreferences?: Preferences) {
     if (initialPreferences.terminalTheme) setTerminalThemeNameState(initialPreferences.terminalTheme);
     if (initialPreferences.fontSize) setFontSizeState(initialPreferences.fontSize);
     if (initialPreferences.fontFamily) setFontFamilyState(initialPreferences.fontFamily);
+    if (initialPreferences.pasteImageTypes) setPasteImageTypesState(initialPreferences.pasteImageTypes);
+    if (initialPreferences.pasteImageMaxSizeMB) setPasteImageMaxSizeMBState(initialPreferences.pasteImageMaxSizeMB);
   }, [initialPreferences]);
 
   // Listen for system theme changes
@@ -105,8 +126,8 @@ export function useThemeProvider(initialPreferences?: Preferences) {
   }, []);
 
   const allPrefs = useCallback(() => ({
-    uiTheme: uiMode, terminalTheme: terminalThemeName, fontSize, fontFamily,
-  }), [uiMode, terminalThemeName, fontSize, fontFamily]);
+    uiTheme: uiMode, terminalTheme: terminalThemeName, fontSize, fontFamily, pasteImageTypes, pasteImageMaxSizeMB,
+  }), [uiMode, terminalThemeName, fontSize, fontFamily, pasteImageTypes, pasteImageMaxSizeMB]);
 
   const setUIMode = useCallback((mode: UIThemeMode) => {
     setUIModeState(mode);
@@ -128,6 +149,16 @@ export function useThemeProvider(initialPreferences?: Preferences) {
     savePreferences({ ...allPrefs(), fontFamily: family });
   }, [savePreferences, allPrefs]);
 
+  const setPasteImageTypes = useCallback((types: string[]) => {
+    setPasteImageTypesState(types);
+    savePreferences({ ...allPrefs(), pasteImageTypes: types });
+  }, [savePreferences, allPrefs]);
+
+  const setPasteImageMaxSizeMB = useCallback((size: number) => {
+    setPasteImageMaxSizeMBState(size);
+    savePreferences({ ...allPrefs(), pasteImageMaxSizeMB: size });
+  }, [savePreferences, allPrefs]);
+
   const terminalTheme = useMemo(() => getTerminalTheme(terminalThemeName), [terminalThemeName]);
 
   return useMemo(() => ({
@@ -141,5 +172,9 @@ export function useThemeProvider(initialPreferences?: Preferences) {
     setFontSize,
     fontFamily,
     setFontFamily,
-  }), [ui, uiMode, setUIMode, terminalTheme, terminalThemeName, setTerminalThemeName, fontSize, setFontSize, fontFamily, setFontFamily]);
+    pasteImageTypes,
+    setPasteImageTypes,
+    pasteImageMaxSizeMB,
+    setPasteImageMaxSizeMB,
+  }), [ui, uiMode, setUIMode, terminalTheme, terminalThemeName, setTerminalThemeName, fontSize, setFontSize, fontFamily, setFontFamily, pasteImageTypes, setPasteImageTypes, pasteImageMaxSizeMB, setPasteImageMaxSizeMB]);
 }

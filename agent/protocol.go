@@ -3,27 +3,30 @@ package main
 // IncomingMessage is a single struct for all messages from relay.
 // Dispatch by the Type field.
 type IncomingMessage struct {
-	Type      string  `json:"type"`
-	SessionID string  `json:"sessionId,omitempty"`
-	Payload   string  `json:"payload,omitempty"`
-	Shell     string  `json:"shell,omitempty"`
-	Cwd       string  `json:"cwd,omitempty"`
-	Cols      int     `json:"cols,omitempty"`
-	Rows      int     `json:"rows,omitempty"`
-	PublicKey string  `json:"publicKey,omitempty"` // ECDH P-256 public key (base64)
-	Hmac      string  `json:"hmac,omitempty"`      // HMAC-SHA256 for control messages
-	PingID    string  `json:"id,omitempty"`         // ping/pong correlation ID
-	Timestamp float64 `json:"timestamp,omitempty"`  // relay timestamp for RTT measurement
+	Type       string  `json:"type"`
+	SessionID  string  `json:"sessionId,omitempty"`
+	Payload    string  `json:"payload,omitempty"`
+	Shell      string  `json:"shell,omitempty"`
+	Cwd        string  `json:"cwd,omitempty"`
+	Cols       int     `json:"cols,omitempty"`
+	Rows       int     `json:"rows,omitempty"`
+	PublicKey  string  `json:"publicKey,omitempty"` // ECDH P-256 public key (base64)
+	Hmac       string  `json:"hmac,omitempty"`      // HMAC-SHA256 for control messages
+	PingID     string  `json:"id,omitempty"`         // ping/pong correlation ID
+	Timestamp  float64 `json:"timestamp,omitempty"`  // relay timestamp for RTT measurement
+	TransferID string  `json:"transferId,omitempty"` // file transfer correlation ID
+	ChunkIndex int     `json:"chunkIndex,omitempty"` // file transfer chunk index (0-based)
 }
 
 // Outgoing messages — each has its own struct for clean JSON marshaling.
 
 type AgentHelloMsg struct {
-	Type        string `json:"type"`
-	Name        string `json:"name"`
-	OS          string `json:"os"`
-	Fingerprint string `json:"fingerprint"`
-	IdentityKey string `json:"identityKey"` // Ed25519 public key (base64)
+	Type         string   `json:"type"`
+	Name         string   `json:"name"`
+	OS           string   `json:"os"`
+	Fingerprint  string   `json:"fingerprint"`
+	IdentityKey  string   `json:"identityKey"`            // Ed25519 public key (base64)
+	Capabilities []string `json:"capabilities,omitempty"` // e.g. ["clipboard"]
 }
 
 type ServerChallengeMsg struct {
@@ -71,4 +74,27 @@ type AgentPongMsg struct {
 	Type      string  `json:"type"`
 	ID        string  `json:"id"`
 	Timestamp float64 `json:"timestamp"`
+}
+
+// File transfer outgoing messages
+
+type FileTransferAckMsg struct {
+	Type       string `json:"type"`
+	SessionID  string `json:"sessionId"`
+	TransferID string `json:"transferId"`
+	Payload    string `json:"payload"`
+}
+
+type FileTransferProgressMsg struct {
+	Type       string `json:"type"`
+	SessionID  string `json:"sessionId"`
+	TransferID string `json:"transferId"`
+	Payload    string `json:"payload"`
+}
+
+type FileTransferCompleteMsg struct {
+	Type       string `json:"type"`
+	SessionID  string `json:"sessionId"`
+	TransferID string `json:"transferId"`
+	Payload    string `json:"payload"`
 }

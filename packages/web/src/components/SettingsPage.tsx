@@ -25,8 +25,15 @@ interface AgentInfo {
   lastSeen: string | null;
 }
 
+const IMAGE_TYPE_OPTIONS = [
+  { mime: 'image/png', label: 'PNG', desc: 'screenshots, lossless' },
+  { mime: 'image/jpeg', label: 'JPEG', desc: 'photos, lossy' },
+  { mime: 'image/gif', label: 'GIF', desc: 'animated images' },
+  { mime: 'image/webp', label: 'WebP', desc: 'modern format' },
+];
+
 export function SettingsPage({ onAgentDeleted, userRole }: { onAgentDeleted?: () => void; userRole?: string }) {
-  const { ui, terminalThemeName, setTerminalThemeName, fontSize, setFontSize, fontFamily, setFontFamily } = useTheme();
+  const { ui, terminalThemeName, setTerminalThemeName, fontSize, setFontSize, fontFamily, setFontFamily, pasteImageTypes, setPasteImageTypes, pasteImageMaxSizeMB, setPasteImageMaxSizeMB } = useTheme();
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [serverKey, setServerKey] = useState('');
@@ -208,6 +215,52 @@ export function SettingsPage({ onAgentDeleted, userRole }: { onAgentDeleted?: ()
             Reset to Default
           </button>
         ) : null}
+      </div>
+
+      {/* Image Paste Section */}
+      <div style={{ marginBottom: 32 }}>
+        <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: ui.textPrimary }}>Image Paste</h2>
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 13, color: ui.textSecondary, display: 'block', marginBottom: 10 }}>
+            Allowed image types for clipboard transfer:
+          </label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {IMAGE_TYPE_OPTIONS.map(opt => (
+              <label key={opt.mime} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: ui.textPrimary }}>
+                <input
+                  type="checkbox"
+                  checked={pasteImageTypes.includes(opt.mime)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setPasteImageTypes([...pasteImageTypes, opt.mime]);
+                    } else {
+                      setPasteImageTypes(pasteImageTypes.filter(t => t !== opt.mime));
+                    }
+                  }}
+                  style={{ accentColor: ui.accent }}
+                />
+                <span style={{ fontWeight: 500 }}>{opt.label}</span>
+                <span style={{ color: ui.textMuted }}>({opt.desc})</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <label style={{ fontSize: 13, color: ui.textSecondary }}>Max image size:</label>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={pasteImageMaxSizeMB}
+            onChange={(e) => setPasteImageMaxSizeMB(Math.max(1, Math.min(20, Number(e.target.value))))}
+            style={{
+              width: 60, padding: '4px 8px', borderRadius: 6, fontSize: 13,
+              border: `1px solid ${ui.border}`, background: ui.surface, color: ui.textPrimary,
+              fontFamily: MONO_FONT, textAlign: 'center',
+            }}
+          />
+          <span style={{ fontSize: 13, color: ui.textMuted }}>MB</span>
+        </div>
       </div>
 
       {/* Agent Tokens Section */}
