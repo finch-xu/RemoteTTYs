@@ -169,6 +169,30 @@ export const terminalThemes: TerminalTheme[] = [
       brightBlue: '#839496', brightMagenta: '#6C71C4', brightCyan: '#93A1A1', brightWhite: '#FDF6E3',
     },
   },
+  {
+    id: 'macos-basic',
+    name: 'macOS Basic',
+    colors: {
+      background: '#FFFFFF', foreground: '#000000', cursor: '#000000', cursorAccent: '#FFFFFF',
+      selectionBackground: '#B5D5FF',
+      black: '#000000', red: '#990000', green: '#00A600', yellow: '#999900',
+      blue: '#0000B2', magenta: '#B200B2', cyan: '#00A6B2', white: '#BFBFBF',
+      brightBlack: '#666666', brightRed: '#E50000', brightGreen: '#00D900', brightYellow: '#E5E500',
+      brightBlue: '#0000FF', brightMagenta: '#E500E5', brightCyan: '#00E5E5', brightWhite: '#E5E5E5',
+    },
+  },
+  {
+    id: 'high-contrast',
+    name: 'High Contrast',
+    colors: {
+      background: '#000000', foreground: '#FFFFFF', cursor: '#FFFFFF', cursorAccent: '#000000',
+      selectionBackground: '#3A5FCD',
+      black: '#000000', red: '#FF5555', green: '#55FF55', yellow: '#FFFF55',
+      blue: '#6699FF', magenta: '#FF55FF', cyan: '#55FFFF', white: '#FFFFFF',
+      brightBlack: '#808080', brightRed: '#FF8888', brightGreen: '#88FF88', brightYellow: '#FFFF88',
+      brightBlue: '#99BBFF', brightMagenta: '#FF88FF', brightCyan: '#88FFFF', brightWhite: '#FFFFFF',
+    },
+  },
 ];
 
 export const DEFAULT_TERMINAL_THEME = 'warm-night';
