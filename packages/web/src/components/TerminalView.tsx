@@ -1,7 +1,9 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { init, Terminal, FitAddon } from 'ghostty-web';
 import { useTheme } from '../hooks/useTheme';
+import { useProgressBar } from '../hooks/useProgressBar';
 import { UploadOverlay } from './UploadOverlay';
+import { ProgressBar } from './ProgressBar';
 import {
   importPublicKeyRaw,
   deriveSessionKeys,
@@ -51,6 +53,7 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
   const [uploadState, setUploadState] = useState<UploadState | null>(null);
   const [showNoClipboardToast, setShowNoClipboardToast] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const { progress, feed: feedProgress } = useProgressBar();
   const sendEncryptedDataRef = useRef<((data: string) => void) | null>(null);
   const clipboardToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -343,6 +346,7 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
         if (msg.sessionId !== sessionId) return;
         try {
           const bytes = await decryptPayload(msg.payload);
+          feedProgress(bytes);
           term.write(bytes);
         } catch (err) {
           console.error('[E2E] Failed to decrypt pty.data:', err);
@@ -425,6 +429,7 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%', overflow: 'hidden', background: terminalTheme.colors.background }} />
+      <ProgressBar progress={progress} />
       <UploadOverlay
         uploadState={uploadState}
         isDragging={isDragging}

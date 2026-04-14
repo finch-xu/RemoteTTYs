@@ -74,6 +74,26 @@ button:active:not(:disabled) {
   animation: spin 0.6s linear infinite;
 }
 
+/* Progress bar: error state pulse */
+@keyframes progressPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Progress bar: indeterminate sliding */
+@keyframes progressIndeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(433%); }
+}
+
+.progress-bar-pulse {
+  animation: progressPulse 1.5s ease-in-out infinite;
+}
+
+.progress-bar-indeterminate {
+  animation: progressIndeterminate 1.5s ease-in-out infinite;
+}
+
 /* Prevent double-tap zoom on interactive elements (mobile) */
 button, a, [role="button"] {
   touch-action: manipulation;
