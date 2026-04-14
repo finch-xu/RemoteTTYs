@@ -60,7 +60,7 @@ export function UserManagementPage() {
   };
 
   return (
-    <div style={{ flex: 1, padding: 28, overflow: 'auto', fontFamily: UI_FONT }}>
+    <div style={{ flex: 1, padding: 'clamp(14px, 4vw, 28px)', overflow: 'auto', fontFamily: UI_FONT }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <h2 style={{ margin: 0, color: ui.textPrimary, fontSize: 20, fontWeight: 600 }}>User Management</h2>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -84,7 +84,8 @@ export function UserManagementPage() {
       ) : users.length === 0 ? (
         <div style={{ color: ui.textMuted, padding: 20 }}>No users found.</div>
       ) : (
-        <div style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <div style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 10, overflow: 'hidden', minWidth: 560 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -145,6 +146,7 @@ export function UserManagementPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -194,7 +196,7 @@ function CreateUserDialog({ onCreated, onCancel }: { onCreated: () => void; onCa
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: ui.overlay, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={onCancel}>
-      <div ref={dialogRef} className="modal-content" style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 380, fontFamily: UI_FONT }} onClick={e => e.stopPropagation()} role="dialog" aria-label="Create User">
+      <div ref={dialogRef} className="modal-content" style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 380, maxWidth: 'calc(100vw - 32px)', boxSizing: 'border-box', fontFamily: UI_FONT }} onClick={e => e.stopPropagation()} role="dialog" aria-label="Create User">
         <h3 style={{ margin: '0 0 14px', color: ui.textPrimary, fontSize: 16, fontWeight: 600 }}>Create User</h3>
         <label style={{ display: 'block', color: ui.textSecondary, fontSize: 13, marginBottom: 10 }}>
           Username
@@ -243,7 +245,7 @@ function ResetPasswordDialog({ username, onDone, onCancel }: { username: string;
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: ui.overlay, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={onCancel}>
-      <div ref={dialogRef} className="modal-content" style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 380, fontFamily: UI_FONT }} onClick={e => e.stopPropagation()} role="dialog" aria-label="Reset Password">
+      <div ref={dialogRef} className="modal-content" style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 380, maxWidth: 'calc(100vw - 32px)', boxSizing: 'border-box', fontFamily: UI_FONT }} onClick={e => e.stopPropagation()} role="dialog" aria-label="Reset Password">
         <h3 style={{ margin: '0 0 14px', color: ui.textPrimary, fontSize: 16, fontWeight: 600 }}>Reset Password</h3>
         <p style={{ color: ui.textSecondary, fontSize: 13, margin: '0 0 12px' }}>
           Set a new password for <strong style={{ color: ui.textPrimary }}>{username}</strong>

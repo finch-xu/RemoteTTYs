@@ -30,7 +30,7 @@ export function NewTerminalDialog({ onSubmit, onCancel }: NewTerminalDialogProps
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: ui.overlay, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={onCancel}>
-      <div ref={dialogRef} className="modal-content" style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 380, fontFamily: UI_FONT }} onClick={e => e.stopPropagation()} role="dialog" aria-label="New Terminal">
+      <div ref={dialogRef} className="modal-content" style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 380, maxWidth: 'calc(100vw - 32px)', boxSizing: 'border-box', fontFamily: UI_FONT }} onClick={e => e.stopPropagation()} role="dialog" aria-label="New Terminal">
         <h3 style={{ margin: '0 0 14px', color: ui.textPrimary, fontSize: 16, fontWeight: 600 }}>New Terminal</h3>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>

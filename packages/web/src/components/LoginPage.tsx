@@ -40,7 +40,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100vw', height: '100vh', background: t.bg }}>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10, width: 320, fontFamily: UI_FONT }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 320, padding: '0 20px', boxSizing: 'border-box', fontFamily: UI_FONT }}>
         <h2 style={{ color: t.textPrimary, margin: '0 0 4px', fontSize: 22, fontWeight: 600 }}>
           RemoteTTYs
         </h2>

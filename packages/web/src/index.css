@@ -74,6 +74,20 @@ button:active:not(:disabled) {
   animation: spin 0.6s linear infinite;
 }
 
+/* Prevent double-tap zoom on interactive elements (mobile) */
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Safe area insets for notched devices (iPhone X+) */
+@supports (padding: env(safe-area-inset-bottom)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
 /* Fix: hide IME composition artifacts in ghostty-web terminal containers.
    ghostty-web sets contenteditable="true" on the container div, causing
    browser-rendered IME composition text to appear as a visible white bar. */

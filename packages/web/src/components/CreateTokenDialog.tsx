@@ -61,7 +61,7 @@ export function CreateTokenDialog({ onCreated, onCancel }: CreateTokenDialogProp
   if (createdToken) {
     return (
       <div style={{ position: 'fixed', inset: 0, background: ui.overlay, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={onCreated}>
-        <div ref={dialogRef} className="modal-content" style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 440, fontFamily: UI_FONT }} onClick={e => e.stopPropagation()} role="dialog" aria-label="Token Created">
+        <div ref={dialogRef} className="modal-content" style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 440, maxWidth: 'calc(100vw - 32px)', boxSizing: 'border-box', fontFamily: UI_FONT }} onClick={e => e.stopPropagation()} role="dialog" aria-label="Token Created">
           <h3 style={{ margin: '0 0 12px', color: ui.textPrimary, fontSize: 16, fontWeight: 600 }}>Token Created</h3>
           <p style={{ color: ui.warning, fontSize: 13, margin: '0 0 12px' }}>
             Copy this token now. It will only be shown in the settings page.
@@ -85,7 +85,7 @@ export function CreateTokenDialog({ onCreated, onCancel }: CreateTokenDialogProp
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: ui.overlay, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={onCancel}>
-      <div ref={dialogRef} className="modal-content" style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 440, fontFamily: UI_FONT }} onClick={e => e.stopPropagation()} role="dialog" aria-label="New Agent Token">
+      <div ref={dialogRef} className="modal-content" style={{ background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 12, padding: 20, width: 440, maxWidth: 'calc(100vw - 32px)', boxSizing: 'border-box', fontFamily: UI_FONT }} onClick={e => e.stopPropagation()} role="dialog" aria-label="New Agent Token">
         <h3 style={{ margin: '0 0 14px', color: ui.textPrimary, fontSize: 16, fontWeight: 600 }}>New Agent Token</h3>
         <label style={{ display: 'block', color: ui.textSecondary, fontSize: 13, marginBottom: 10 }}>
           Label

@@ -162,7 +162,7 @@ export function AuditLogPage({ userRole }: { userRole: string }) {
   const pageEnd = pageStart + logs.length - 1;
 
   return (
-    <div style={{ flex: 1, padding: 28, overflow: 'auto', fontFamily: UI_FONT }}>
+    <div style={{ flex: 1, padding: 'clamp(14px, 4vw, 28px)', overflow: 'auto', fontFamily: UI_FONT }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '0 0 20px' }}>
         <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: ui.textPrimary }}>Audit Log</h2>
         <button
@@ -305,10 +305,11 @@ export function AuditLogPage({ userRole }: { userRole: string }) {
         </div>
       ) : (
         <>
-          <div style={{
-            border: `1px solid ${ui.border}`, borderRadius: 10, overflow: 'hidden',
-            opacity: loading ? 0.6 : 1, transition: 'opacity 0.15s',
-          }}>
+          <div style={{ overflowX: 'auto' }}>
+            <div style={{
+              border: `1px solid ${ui.border}`, borderRadius: 10, overflow: 'hidden',
+              opacity: loading ? 0.6 : 1, transition: 'opacity 0.15s', minWidth: 480,
+            }}>
             {/* Header */}
             <div style={{
               display: 'flex', gap: 8, padding: '8px 14px',
@@ -367,6 +368,7 @@ export function AuditLogPage({ userRole }: { userRole: string }) {
                 </div>
               );
             })}
+            </div>
           </div>
 
           {/* Pagination */}

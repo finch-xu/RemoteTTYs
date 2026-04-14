@@ -23,9 +23,10 @@ interface TerminalTabsProps {
   clipboardAvailable: boolean;
   send: (msg: object) => void;
   subscribe: (type: string, handler: (msg: any) => void) => () => void;
+  compact?: boolean;
 }
 
-export function TerminalTabs({ agentId, agentName, identityKey, existingSessions, clipboardAvailable, send, subscribe }: TerminalTabsProps) {
+export function TerminalTabs({ agentId, agentName, identityKey, existingSessions, clipboardAvailable, send, subscribe, compact }: TerminalTabsProps) {
   const { ui } = useTheme();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -121,13 +122,13 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: ui.surface, borderBottom: `1px solid ${ui.border}`, height: 38, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, overflow: 'auto', padding: '0 4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: ui.surface, borderBottom: `1px solid ${ui.border}`, height: compact ? 44 : 38, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, overflow: 'auto', padding: '0 4px', flex: 1, minWidth: 0 }}>
           {sessions.map(s => (
             <div
               key={s.sessionId}
               style={{
-                display: 'flex', alignItems: 'center', gap: 4, padding: '5px 14px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 4, padding: compact ? '8px 14px' : '5px 14px', cursor: 'pointer',
                 fontSize: 13, fontFamily: MONO_FONT, whiteSpace: 'nowrap', userSelect: 'none', borderRadius: '6px 6px 0 0',
                 background: s.sessionId === activeSessionId ? ui.bg : 'transparent',
                 color: s.exited ? ui.textMuted : ui.textPrimary,
@@ -138,27 +139,29 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
               <span>{s.label}</span>
               {s.exited && <span style={{ color: ui.textMuted, fontSize: 10, marginLeft: 4 }}>exited</span>}
               <button
-                style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', padding: '0 2px', marginLeft: 4, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', padding: compact ? '4px' : '0 2px', marginLeft: 4, lineHeight: 1, display: 'flex', alignItems: 'center' }}
                 onClick={(e) => { e.stopPropagation(); handleCloseTab(s.sessionId); }}
                 title="Close terminal"
                 aria-label="Close terminal"
               >
-                <X size={14} strokeWidth={1.75} />
+                <X size={compact ? 16 : 14} strokeWidth={1.75} />
               </button>
             </div>
           ))}
           <button
-            style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', padding: '2px 10px', lineHeight: 1, display: 'flex', alignItems: 'center' }}
+            style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', padding: compact ? '6px 10px' : '2px 10px', lineHeight: 1, display: 'flex', alignItems: 'center' }}
             onClick={() => setShowNewDialog(true)}
             title="New terminal"
             aria-label="New terminal"
           >
-            <Plus size={18} strokeWidth={1.75} />
+            <Plus size={compact ? 20 : 18} strokeWidth={1.75} />
           </button>
         </div>
-        <div style={{ color: ui.textSecondary, fontSize: 12, paddingRight: 10, fontFamily: MONO_FONT }}>
-          {agentName}
-        </div>
+        {!compact && (
+          <div style={{ color: ui.textSecondary, fontSize: 12, paddingRight: 10, fontFamily: MONO_FONT, flexShrink: 0 }}>
+            {agentName}
+          </div>
+        )}
       </div>
 
       <div style={{ flex: 1, position: 'relative' }}>

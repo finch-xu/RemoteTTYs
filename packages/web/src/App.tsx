@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Monitor } from 'lucide-react';
+import { Monitor, Menu } from 'lucide-react';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useAgentStore } from './hooks/useAgentStore';
+import { useResponsive } from './hooks/useResponsive';
 import { ThemeContext, useTheme, useThemeProvider } from './hooks/useTheme';
 import { Sidebar } from './components/Sidebar';
 import { TerminalTabs } from './components/TerminalTabs';
@@ -142,6 +143,9 @@ function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLog
   const { agents, selectedAgent, selectedAgentId, selectAgent, deleteAgent, fetchAgents } = useAgentStore(subscribe);
   const [view, setView] = useState<AppView>('terminal');
   const [fingerprintWarning, setFingerprintWarning] = useState<FingerprintWarningState | null>(null);
+  const { isDesktop } = useResponsive();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const drawerMode = !isDesktop;
   // Track which agent IDs we've already checked to avoid re-checking on every render
   const checkedAgentsRef = useRef<Set<string>>(new Set());
 
@@ -202,8 +206,30 @@ function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLog
         onLogout={onLogout}
         userRole={userInfo?.role ?? 'user'}
         relayLatencyMs={relayLatencyMs}
+        drawerMode={drawerMode}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {drawerMode && (
+          <div style={{
+            display: 'flex', alignItems: 'center', height: 44, flexShrink: 0,
+            padding: '0 12px', gap: 12,
+            background: ui.surface, borderBottom: `1px solid ${ui.border}`,
+            fontFamily: UI_FONT,
+          }}>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open menu"
+              style={{ background: 'none', border: 'none', padding: 6, cursor: 'pointer', color: ui.textPrimary, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+            >
+              <Menu size={20} strokeWidth={1.75} />
+            </button>
+            <span style={{ fontSize: 13, color: ui.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {selectedAgent?.name ?? 'RemoteTTYs'}
+            </span>
+          </div>
+        )}
         {view === 'settings' ? (
           <SettingsPage onAgentDeleted={fetchAgents} userRole={userInfo?.role ?? 'user'} />
         ) : view === 'users' ? (
@@ -265,6 +291,7 @@ function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLog
               clipboardAvailable={selectedAgent.capabilities.includes('clipboard')}
               send={send}
               subscribe={subscribe}
+              compact={drawerMode}
             />
           </div>
         )}

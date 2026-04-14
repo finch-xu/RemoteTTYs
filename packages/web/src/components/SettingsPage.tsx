@@ -121,7 +121,7 @@ export function SettingsPage({ onAgentDeleted, userRole }: { onAgentDeleted?: ()
   };
 
   return (
-    <div style={{ flex: 1, padding: 28, overflow: 'auto', fontFamily: UI_FONT }}>
+    <div style={{ flex: 1, padding: 'clamp(14px, 4vw, 28px)', overflow: 'auto', fontFamily: UI_FONT }}>
       {/* Terminal Theme Section */}
       <div style={{ marginBottom: 32 }}>
         <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: ui.textPrimary }}>Terminal Theme</h2>
