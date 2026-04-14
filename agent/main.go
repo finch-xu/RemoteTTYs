@@ -130,6 +130,10 @@ func runDaemon() {
 		}
 	}
 
+	if err := os.MkdirAll(rttysDir(), 0700); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create ~/.rttys: %v\n", err)
+		os.Exit(1)
+	}
 	logFile := rttysPath("agent.log")
 	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
@@ -255,8 +259,12 @@ func runInit() {
 		}
 	}
 
-	// Write config.yaml next to the executable
-	configDir := exeDir()
+	// Write config.yaml to ~/.rttys/
+	configDir := rttysDir()
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create config directory: %v\n", err)
+		os.Exit(1)
+	}
 	data, _ := yaml.Marshal(config)
 	configPath := filepath.Join(configDir, configFileName)
 	if err := os.WriteFile(configPath, data, 0600); err != nil {
@@ -265,21 +273,6 @@ func runInit() {
 	}
 
 	fmt.Printf("Config saved to %s\n", configPath)
-}
-
-// exeDir returns the directory containing the current executable.
-func exeDir() string {
-	exe, err := os.Executable()
-	if err != nil {
-		// Fallback to current working directory
-		dir, _ := os.Getwd()
-		return dir
-	}
-	real, err := filepath.EvalSymlinks(exe)
-	if err != nil {
-		return filepath.Dir(exe)
-	}
-	return filepath.Dir(real)
 }
 
 // --- PID file helpers ---
