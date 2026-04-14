@@ -62,7 +62,9 @@ export const MONO_FONT = 'Menlo, Monaco, "Courier New", monospace';
 export const FONT_FAMILIES = [
   { label: 'System Mono', value: MONO_FONT },
   { label: 'JetBrains Mono', value: '"JetBrains Mono Variable", monospace' },
+  { label: 'Cascadia Mono', value: '"Cascadia Mono Variable", monospace' },
   { label: 'Cascadia Mono NF', value: 'CascadiaMonoNF, monospace' },
+  { label: 'Noto Sans Mono', value: '"Noto Sans Mono Variable", monospace' },
 ];
 
 // --- Terminal Themes ---
