@@ -43,9 +43,11 @@ jobs:
           BUILD_NAME: ${{ matrix.name }}
         run: |
           cd agent
+          VERSION="${GITHUB_REF#refs/tags/}"
+          COMMIT="${GITHUB_SHA::8}"
           EXT=""
           if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
-          go build -trimpath -ldflags="-s -w" -o "../rttys-agent-${BUILD_NAME}${EXT}" .
+          go build -trimpath -ldflags="-s -w -X main.Version=${VERSION} -X main.GitCommit=${COMMIT} -X main.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o "../rttys-agent-${BUILD_NAME}${EXT}" .
       - uses: actions/upload-artifact@v4
         with:
           name: rttys-agent-${{ matrix.name }}
@@ -61,7 +63,8 @@ jobs:
           node-version: '22'
       - run: npm ci
       - run: cd packages/relay && npx tsc
-      - run: cd packages/web && npx vite build
+      - run: VITE_APP_VERSION="${GITHUB_REF#refs/tags/}" npx vite build
+        working-directory: packages/web
       - run: cp -r packages/web/dist packages/relay/public
       - name: Package relay
         run: tar -czf rttys-relay.tar.gz -C packages/relay dist public package.json
@@ -89,6 +92,9 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            RTTYS_VERSION=${{ steps.version.outputs.tag }}
+            RTTYS_COMMIT=${{ github.sha }}
           tags: |
             ghcr.io/${{ github.repository_owner }}/remotettys:${{ steps.version.outputs.tag }}
             ghcr.io/${{ github.repository_owner }}/remotettys:latest

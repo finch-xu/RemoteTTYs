@@ -3,6 +3,9 @@
 # ============================================================
 FROM node:24-alpine AS build
 
+ARG RTTYS_VERSION=dev
+ARG RTTYS_COMMIT=
+
 # Build dependencies for better-sqlite3 (native addon)
 RUN apk add --no-cache python3 make g++
 
@@ -21,7 +24,7 @@ COPY packages/web/ ./packages/web/
 COPY packages/relay/ ./packages/relay/
 
 # Build web (Vite) — also copies ghostty-vt.wasm to public/
-RUN npm run build --workspace=web
+RUN VITE_APP_VERSION=${RTTYS_VERSION} npm run build --workspace=web
 
 # Copy web build output to relay's public directory
 RUN rm -rf packages/relay/public && \
@@ -44,6 +47,9 @@ RUN mkdir /app/prod && \
 # ============================================================
 FROM node:24-alpine
 
+ARG RTTYS_VERSION=dev
+ARG RTTYS_COMMIT=
+
 WORKDIR /app
 
 # Copy production node_modules
@@ -61,6 +67,8 @@ RUN mkdir -p /app/data
 ENV NODE_ENV=production
 ENV PORT=8080
 ENV RTTYS_DB=/app/data/relay.db
+ENV RTTYS_VERSION=${RTTYS_VERSION}
+ENV RTTYS_COMMIT=${RTTYS_COMMIT}
 
 EXPOSE 8080
 

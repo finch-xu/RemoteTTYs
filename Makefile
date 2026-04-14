@@ -1,12 +1,17 @@
 .PHONY: all agent agent-windows relay web dev clean
 
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+GIT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS := -X main.Version=$(VERSION) -X main.GitCommit=$(GIT_COMMIT) -X main.BuildDate=$(BUILD_DATE)
+
 all: agent relay web
 
 agent:
-	cd agent && go build -o ../bin/rttys-agent .
+	cd agent && go build -ldflags="$(LDFLAGS)" -o ../bin/rttys-agent .
 
 agent-windows:
-	cd agent && GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o ../bin/rttys-agent.exe .
+	cd agent && GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="$(LDFLAGS)" -o ../bin/rttys-agent.exe .
 
 relay:
 	cd packages/relay && npm run build

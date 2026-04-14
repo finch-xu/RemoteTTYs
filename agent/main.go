@@ -76,7 +76,7 @@ func runForeground(config *Config) {
 	}
 	log.Printf("Agent identity fingerprint: %s", identity.Fingerprint())
 
-	log.Printf("rttys-agent starting (name=%s, relay=%s, shell=%s)", config.Name, config.Relay, config.Shell)
+	log.Printf("rttys-agent %s starting (name=%s, relay=%s, shell=%s)", Version, config.Name, config.Relay, config.Shell)
 
 	// Prevent duplicate instances from clobbering each other's PID files
 	if err := checkExistingInstance(); err != nil {
@@ -174,6 +174,8 @@ func runStop() {
 }
 
 func runStatus() {
+	fmt.Printf("Version:  %s\n", Version)
+
 	pid, err := readPIDFile()
 	if err != nil {
 		fmt.Println("Status: not running")

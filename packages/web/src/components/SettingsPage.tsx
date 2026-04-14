@@ -348,6 +348,17 @@ export function SettingsPage({ onAgentDeleted, userRole }: { onAgentDeleted?: ()
         )}
       </div>
 
+      {/* Version */}
+      <div style={{
+        marginTop: 48, paddingTop: 16,
+        borderTop: `1px solid ${ui.border}`,
+        textAlign: 'center',
+        fontSize: 12, color: ui.textMuted,
+        fontFamily: MONO_FONT,
+      }}>
+        RemoteTTYs {__APP_VERSION__}
+      </div>
+
       {showCreate && (
         <CreateTokenDialog
           onCreated={() => { setShowCreate(false); fetchTokens(); }}
