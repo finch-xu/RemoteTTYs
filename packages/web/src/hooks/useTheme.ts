@@ -64,6 +64,15 @@ export function useThemeProvider(initialPreferences?: Preferences) {
   );
   const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(resolveSystemTheme);
 
+  // Sync state when preferences arrive after initial render (async fetch)
+  useEffect(() => {
+    if (!initialPreferences) return;
+    if (initialPreferences.uiTheme) setUIModeState(initialPreferences.uiTheme as UIThemeMode);
+    if (initialPreferences.terminalTheme) setTerminalThemeNameState(initialPreferences.terminalTheme);
+    if (initialPreferences.fontSize) setFontSizeState(initialPreferences.fontSize);
+    if (initialPreferences.fontFamily) setFontFamilyState(initialPreferences.fontFamily);
+  }, [initialPreferences]);
+
   // Listen for system theme changes
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');

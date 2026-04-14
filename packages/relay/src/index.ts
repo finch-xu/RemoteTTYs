@@ -234,6 +234,17 @@ function validatePassword(password: string): string | null {
   return null;
 }
 
+// --- Version ---
+
+const versionInfo = {
+  version: process.env.RTTYS_VERSION || 'dev',
+  commit: process.env.RTTYS_COMMIT || '',
+};
+
+app.get('/api/version', relaxedLimiter, (_req, res) => {
+  res.json(versionInfo);
+});
+
 // --- Setup (first-time initialization) ---
 
 app.get('/api/setup/status', relaxedLimiter, (_req, res) => {
@@ -319,7 +330,8 @@ app.put('/api/preferences', standardLimiter, requireAuth, requireCSRF, (req, res
   if (typeof terminalTheme === 'string') prefs.terminalTheme = terminalTheme;
   if (typeof fontSize === 'number' && fontSize >= 10 && fontSize <= 24) prefs.fontSize = fontSize;
   if (typeof fontFamily === 'string') prefs.fontFamily = fontFamily;
-  setUserPreferences((req as AuthRequest).username, prefs);
+  const existing = getUserPreferences((req as AuthRequest).username);
+  setUserPreferences((req as AuthRequest).username, { ...existing, ...prefs });
   res.json({ ok: true });
 });
 
