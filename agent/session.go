@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -27,8 +28,15 @@ func validateShell(shell string) (string, error) {
 	if shell == "" {
 		return "", fmt.Errorf("empty shell")
 	}
-	// Reject shells with arguments or special characters
-	if strings.ContainsAny(shell, " \t\n;|&$`\\\"'(){}[]<>!#~") {
+	// Reject shells with arguments or special characters.
+	// On Windows, backslash (path separator) and space (e.g. "Program Files") are legitimate.
+	var invalidChars string
+	if runtime.GOOS == "windows" {
+		invalidChars = "\t\n;|&$`\"'(){}[]<>!#~"
+	} else {
+		invalidChars = " \t\n;|&$`\\\"'(){}[]<>!#~"
+	}
+	if strings.ContainsAny(shell, invalidChars) {
 		return "", fmt.Errorf("shell path contains invalid characters: %s", shell)
 	}
 	// Check basename against whitelist (strip .exe suffix for Windows compatibility)
@@ -126,6 +134,11 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 	agentPriv, agentPub, err := GenerateECDHKeyPair()
 	if err != nil {
 		log.Printf("session %s: ECDH key generation failed: %v", msg.SessionID, err)
+		c.Send(PtyErrorMsg{
+			Type:      "pty.error",
+			SessionID: msg.SessionID,
+			Error:     "session key negotiation failed",
+		})
 		return
 	}
 	agentPubRaw := agentPub.Bytes()
@@ -133,12 +146,22 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 	sharedSecret, err := ComputeSharedSecret(agentPriv, browserPub)
 	if err != nil {
 		log.Printf("session %s: ECDH shared secret failed: %v", msg.SessionID, err)
+		c.Send(PtyErrorMsg{
+			Type:      "pty.error",
+			SessionID: msg.SessionID,
+			Error:     "session key negotiation failed",
+		})
 		return
 	}
 
 	keys, err := DeriveSessionKeys(sharedSecret, browserPubRaw, agentPubRaw)
 	if err != nil {
 		log.Printf("session %s: key derivation failed: %v", msg.SessionID, err)
+		c.Send(PtyErrorMsg{
+			Type:      "pty.error",
+			SessionID: msg.SessionID,
+			Error:     "session key negotiation failed",
+		})
 		return
 	}
 
@@ -155,6 +178,11 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 	resolvedShell, err := validateShell(shell)
 	if err != nil {
 		log.Printf("session %s: rejected shell: %v", msg.SessionID, err)
+		c.Send(PtyErrorMsg{
+			Type:      "pty.error",
+			SessionID: msg.SessionID,
+			Error:     fmt.Sprintf("shell rejected: %s", err.Error()),
+		})
 		return
 	}
 
@@ -185,6 +213,11 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 	ptyHandle, err := startPTY(resolvedShell, validCwd, env)
 	if err != nil {
 		log.Printf("failed to start pty for session %s: %v", msg.SessionID, err)
+		c.Send(PtyErrorMsg{
+			Type:      "pty.error",
+			SessionID: msg.SessionID,
+			Error:     "failed to start terminal session",
+		})
 		return
 	}
 	ptyReady := false
