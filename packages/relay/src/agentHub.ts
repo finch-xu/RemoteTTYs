@@ -1,6 +1,6 @@
 import { WebSocket } from 'ws';
 import { randomUUID } from 'crypto';
-import { AgentHello, AgentMessage, ServerChallenge, parseMessage } from './protocol.js';
+import { AgentHello, AgentPong, AgentMessage, ServerChallenge, parseMessage } from './protocol.js';
 import { audit, findAgentByTokenAndName, upsertAgent, setAgentOnline, setAgentFingerprint } from './db.js';
 
 // WebSocket close codes for agent connections
@@ -16,6 +16,8 @@ export interface AgentConnection {
   sessions: Set<string>;
   lastSeen: number;
   identityKey: string;
+  latencyMs: number | null;
+  pendingPing: { id: string; sentAt: number } | null;
 }
 
 export interface PreAuth {
@@ -28,6 +30,7 @@ const agents = new Map<string, AgentConnection>();
 
 let onAgentMessage: (agentId: string, msg: AgentMessage) => void = () => {};
 let onAgentDisconnect: (agentId: string, tokenHash: string) => void = () => {};
+let onLatencyUpdate: (agentId: string, latencyMs: number | null) => void = () => {};
 
 export function setAgentMessageHandler(handler: typeof onAgentMessage) {
   onAgentMessage = handler;
@@ -35,6 +38,10 @@ export function setAgentMessageHandler(handler: typeof onAgentMessage) {
 
 export function setAgentDisconnectHandler(handler: typeof onAgentDisconnect) {
   onAgentDisconnect = handler;
+}
+
+export function setLatencyUpdateHandler(handler: typeof onLatencyUpdate) {
+  onLatencyUpdate = handler;
 }
 
 const MAX_AGENT_MSG_SIZE = 512 * 1024; // 512KB (PTY data is base64, can be larger)
@@ -110,6 +117,8 @@ export function handleAgentConnection(ws: WebSocket, preAuth: PreAuth) {
         sessions: new Set(),
         lastSeen: Date.now(),
         identityKey: (msg as AgentHello).identityKey || '',
+        latencyMs: null,
+        pendingPing: null,
       };
       // Close old connection if this agent is reconnecting before the old WS timed out
       const existingConn = agents.get(agentId);
@@ -131,6 +140,19 @@ export function handleAgentConnection(ws: WebSocket, preAuth: PreAuth) {
     const conn = agents.get(agentId);
     if (conn) {
       conn.lastSeen = Date.now();
+    }
+
+    if (msg.type === 'agent.pong') {
+      const pong = msg as AgentPong;
+      if (conn && conn.pendingPing && pong.id === conn.pendingPing.id) {
+        const rawLatency = Date.now() - pong.timestamp;
+        conn.latencyMs = conn.latencyMs === null
+          ? rawLatency
+          : Math.round(0.3 * rawLatency + 0.7 * conn.latencyMs);
+        conn.pendingPing = null;
+        onLatencyUpdate(agentId, conn.latencyMs);
+      }
+      return;
     }
 
     onAgentMessage(agentId, msg);
@@ -186,4 +208,35 @@ export function disconnectAgentsByToken(token: string): void {
       conn.ws.close(4002, 'Token disabled');
     }
   }
+}
+
+const PING_INTERVAL_MS = 30_000;
+const PING_TIMEOUT_MS = 10_000;
+
+export function startPingLoop(): ReturnType<typeof setInterval> {
+  return setInterval(() => {
+    const now = Date.now();
+    for (const conn of agents.values()) {
+      if (conn.ws.readyState !== WebSocket.OPEN) continue;
+
+      // Skip sending new ping if the previous one timed out
+      if (conn.pendingPing && now - conn.pendingPing.sentAt > PING_TIMEOUT_MS) {
+        const hadLatency = conn.latencyMs !== null;
+        conn.latencyMs = null;
+        conn.pendingPing = null;
+        if (hadLatency) {
+          onLatencyUpdate(conn.id, null);
+        }
+        continue;
+      }
+
+      const pingId = randomUUID();
+      conn.pendingPing = { id: pingId, sentAt: now };
+      conn.ws.send(JSON.stringify({
+        type: 'agent.ping',
+        id: pingId,
+        timestamp: now,
+      }));
+    }
+  }, PING_INTERVAL_MS);
 }

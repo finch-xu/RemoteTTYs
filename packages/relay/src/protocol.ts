@@ -17,6 +17,12 @@ export interface AgentHeartbeat extends BaseMessage {
   type: 'agent.heartbeat';
 }
 
+export interface AgentPong extends BaseMessage {
+  type: 'agent.pong';
+  id: string;
+  timestamp: number;
+}
+
 export interface PtyCreated extends BaseMessage {
   type: 'pty.created';
   sessionId: string;
@@ -49,7 +55,7 @@ export interface PtyError extends BaseMessage {
   error: string;
 }
 
-export type AgentMessage = AgentHello | AgentHeartbeat | PtyCreated | PtyData | PtyExited | PtyReplay | PtyError;
+export type AgentMessage = AgentHello | AgentHeartbeat | AgentPong | PtyCreated | PtyData | PtyExited | PtyReplay | PtyError;
 
 // --- Relay → Agent (auth) ---
 
@@ -87,7 +93,13 @@ export interface PtyReplayRequest extends BaseMessage {
   sessionId: string;
 }
 
-export type RelayToAgentMessage = ServerChallenge | PtyCreate | PtyData | PtyResize | PtyClose | PtyReplayRequest;
+export interface AgentPing extends BaseMessage {
+  type: 'agent.ping';
+  id: string;
+  timestamp: number;
+}
+
+export type RelayToAgentMessage = ServerChallenge | AgentPing | PtyCreate | PtyData | PtyResize | PtyClose | PtyReplayRequest;
 
 // --- Browser → Relay ---
 
@@ -187,6 +199,17 @@ export interface RelayPtyError extends BaseMessage {
   error: string;
 }
 
+export interface BrowserPing extends BaseMessage {
+  type: 'browser.ping';
+  timestamp: number;
+}
+
+export interface RelayAgentLatency extends BaseMessage {
+  type: 'agent.latency';
+  agentId: string;
+  latencyMs: number | null;
+}
+
 export type RelayToBrowserMessage =
   | RelayAgentOnline
   | RelayAgentOffline
@@ -195,7 +218,8 @@ export type RelayToBrowserMessage =
   | RelayPtyData
   | RelayPtyExited
   | RelayPtyReplay
-  | RelayPtyError;
+  | RelayPtyError
+  | RelayAgentLatency;
 
 export function parseMessage(raw: string): BaseMessage {
   const msg = JSON.parse(raw);

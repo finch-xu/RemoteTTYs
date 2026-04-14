@@ -328,3 +328,16 @@ export function handleAgentDisconnect(agentId: string, tokenHash: string) {
     }
   }
 }
+
+export function handleLatencyUpdate(agentId: string, latencyMs: number | null) {
+  const agent = getAgent(agentId);
+  if (!agent) return;
+  const ownerId = getTokenOwner(agent.token);
+  if (ownerId !== undefined) {
+    broadcastToUserBrowsers(ownerId, {
+      type: 'agent.latency',
+      agentId,
+      latencyMs,
+    });
+  }
+}

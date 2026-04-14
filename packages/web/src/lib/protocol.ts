@@ -60,7 +60,13 @@ export interface PtyError extends BaseMessage {
   error: string;
 }
 
-export type RelayMessage = AgentOnline | AgentOffline | PtyCreated | PtyData | PtyExited | PtyReplay | AgentSessions | PtyError;
+export interface AgentLatency extends BaseMessage {
+  type: 'agent.latency';
+  agentId: string;
+  latencyMs: number | null;
+}
+
+export type RelayMessage = AgentOnline | AgentOffline | PtyCreated | PtyData | PtyExited | PtyReplay | AgentSessions | PtyError | AgentLatency;
 
 // Browser → Relay messages
 export interface BrowserPtyCreate extends BaseMessage {

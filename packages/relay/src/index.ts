@@ -7,9 +7,11 @@ import {
   handleAgentConnection,
   setAgentMessageHandler,
   setAgentDisconnectHandler,
+  setLatencyUpdateHandler,
   getAgent,
   getAllAgents,
   disconnectAgentsByToken,
+  startPingLoop,
 } from './agentHub.js';
 import {
   handleBrowserConnection,
@@ -22,6 +24,7 @@ import {
   handleBrowserMessage,
   handleAgentDisconnect,
   handleBrowserDisconnect,
+  handleLatencyUpdate,
 } from './router.js';
 import { getConfig } from './config.js';
 import { verifyJWT, verifyLogin, generateJWT, verifyAgentToken } from './auth.js';
@@ -95,6 +98,7 @@ const browserWss = new WebSocketServer({ noServer: true });
 
 setAgentMessageHandler(handleAgentMessage);
 setAgentDisconnectHandler(handleAgentDisconnect);
+setLatencyUpdateHandler(handleLatencyUpdate);
 setBrowserMessageHandler(handleBrowserMessage);
 setBrowserDisconnectHandler(handleBrowserDisconnect);
 
@@ -350,6 +354,7 @@ app.get('/api/agents', standardLimiter, requireAuth, (req, res) => {
       sessions: online ? Array.from(online.sessions) : [],
       fingerprint: a.fingerprint,
       identityKey: online?.identityKey ?? null,
+      latencyMs: online?.latencyMs ?? null,
       lastSeen: a.last_seen,
       createdAt: a.created_at,
     };
@@ -614,4 +619,7 @@ app.get('*', relaxedLimiter, (_req, res) => {
 const config = getConfig();
 server.listen(config.port, () => {
   console.log(`rttys-relay listening on port ${config.port}`);
+  const pingTimer = startPingLoop();
+  process.on('SIGTERM', () => { clearInterval(pingTimer); server.close(); });
+  process.on('SIGINT', () => { clearInterval(pingTimer); server.close(); });
 });

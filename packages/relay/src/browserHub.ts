@@ -1,6 +1,6 @@
 import { WebSocket } from 'ws';
 import { randomUUID } from 'crypto';
-import { BrowserMessage, parseMessage } from './protocol.js';
+import { BrowserMessage, BrowserPing, parseMessage } from './protocol.js';
 
 export interface BrowserConnection {
   id: string;
@@ -51,15 +51,20 @@ export function handleBrowserConnection(ws: WebSocket, userInfo: { username: str
       ws.close(1009, 'Message too large');
       return;
     }
-    let msg: BrowserMessage;
+    let parsed;
     try {
-      msg = parseMessage(raw) as BrowserMessage;
+      parsed = parseMessage(raw);
     } catch {
       console.error('Invalid message from browser:', raw);
       return;
     }
 
-    onBrowserMessage(browserId, msg);
+    if (parsed.type === 'browser.ping') {
+      ws.send(JSON.stringify({ type: 'browser.pong', timestamp: (parsed as BrowserPing).timestamp }));
+      return;
+    }
+
+    onBrowserMessage(browserId, parsed as BrowserMessage);
   });
 
   ws.on('close', () => {

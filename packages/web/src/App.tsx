@@ -138,7 +138,7 @@ interface FingerprintWarningState {
 
 function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLogout: () => void }) {
   const { ui } = useTheme();
-  const { connected, send, subscribe } = useWebSocket();
+  const { connected, relayLatencyMs, send, subscribe } = useWebSocket();
   const { agents, selectedAgent, selectedAgentId, selectAgent, deleteAgent, fetchAgents } = useAgentStore(subscribe);
   const [view, setView] = useState<AppView>('terminal');
   const [fingerprintWarning, setFingerprintWarning] = useState<FingerprintWarningState | null>(null);
@@ -201,6 +201,7 @@ function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLog
         onViewChange={setView}
         onLogout={onLogout}
         userRole={userInfo?.role ?? 'user'}
+        relayLatencyMs={relayLatencyMs}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {view === 'settings' ? (

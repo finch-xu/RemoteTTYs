@@ -3,7 +3,7 @@ import { Settings, Sun, Moon, SunMoon, LogOut, ChevronLeft, ChevronRight, Scroll
 import type { AgentInfo } from '../hooks/useAgentStore';
 import { useTheme } from '../hooks/useTheme';
 import { UI_FONT, MONO_FONT } from '../lib/theme';
-import type { UIThemeMode } from '../lib/theme';
+import type { UITheme, UIThemeMode } from '../lib/theme';
 
 const SIDEBAR_WIDTH = 200;
 const SIDEBAR_COLLAPSED_WIDTH = 48;
@@ -17,6 +17,7 @@ interface SidebarProps {
   onViewChange: (view: 'terminal' | 'settings' | 'audit' | 'users') => void;
   onLogout: () => void;
   userRole: string;
+  relayLatencyMs: number | null;
 }
 
 function getOsLabel(os: string): string {
@@ -24,6 +25,13 @@ function getOsLabel(os: string): string {
   if (os === 'linux') return 'Linux';
   if (os === 'windows') return 'Windows';
   return os;
+}
+
+function getLatencyColor(latencyMs: number | null, ui: UITheme): string {
+  if (latencyMs === null) return ui.textMuted;
+  if (latencyMs < 100) return ui.online;
+  if (latencyMs < 300) return ui.warning;
+  return ui.error;
 }
 
 const themeModeIcons: Record<UIThemeMode, typeof Sun> = {
@@ -45,7 +53,7 @@ const btnReset: React.CSSProperties = {
   font: 'inherit', cursor: 'pointer', textAlign: 'left' as const,
 };
 
-export function Sidebar({ agents, selectedAgentId, onSelectAgent, currentView, onViewChange, onLogout, userRole }: SidebarProps) {
+export function Sidebar({ agents, selectedAgentId, onSelectAgent, currentView, onViewChange, onLogout, userRole, relayLatencyMs }: SidebarProps) {
   const { ui, uiMode, setUIMode } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -103,7 +111,7 @@ export function Sidebar({ agents, selectedAgentId, onSelectAgent, currentView, o
             onClick={() => onSelectAgent(agent.id)}
             onMouseEnter={() => setHoveredId(agent.id)}
             onMouseLeave={() => setHoveredId(null)}
-            title={collapsed ? `${agent.name} (${getOsLabel(agent.os)})` : undefined}
+            title={collapsed ? `${agent.name} (${getOsLabel(agent.os)})${agent.online && agent.latencyMs !== null ? ` \u00b7 ${(agent.latencyMs + (relayLatencyMs ?? 0))}ms` : ''}` : undefined}
             aria-label={collapsed ? `${agent.name} (${getOsLabel(agent.os)})` : undefined}
           >
             <span style={{ color: agent.online ? ui.online : ui.textMuted, fontSize: 10, flexShrink: 0 }}>{'\u25cf'}</span>
@@ -115,6 +123,14 @@ export function Sidebar({ agents, selectedAgentId, onSelectAgent, currentView, o
                 <div style={{ fontSize: 11, color: ui.textSecondary, fontFamily: MONO_FONT }}>
                   {getOsLabel(agent.os)}
                   {agent.sessions.length > 0 && ` \u00b7 ${agent.sessions.length}`}
+                  {agent.online && agent.latencyMs !== null && (
+                    <span
+                      style={{ color: getLatencyColor(agent.latencyMs + (relayLatencyMs ?? 0), ui), cursor: 'default' }}
+                      title={`Web \u2194 Relay: ${relayLatencyMs ?? '?'}ms\nRelay \u2194 Agent: ${agent.latencyMs}ms`}
+                    >
+                      {` \u00b7 ${agent.latencyMs + (relayLatencyMs ?? 0)}ms`}
+                    </span>
+                  )}
                 </div>
               </div>
             )}

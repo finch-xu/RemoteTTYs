@@ -3,15 +3,17 @@ package main
 // IncomingMessage is a single struct for all messages from relay.
 // Dispatch by the Type field.
 type IncomingMessage struct {
-	Type      string `json:"type"`
-	SessionID string `json:"sessionId,omitempty"`
-	Payload   string `json:"payload,omitempty"`
-	Shell     string `json:"shell,omitempty"`
-	Cwd       string `json:"cwd,omitempty"`
-	Cols      int    `json:"cols,omitempty"`
-	Rows      int    `json:"rows,omitempty"`
-	PublicKey string `json:"publicKey,omitempty"` // ECDH P-256 public key (base64)
-	Hmac      string `json:"hmac,omitempty"`      // HMAC-SHA256 for control messages
+	Type      string  `json:"type"`
+	SessionID string  `json:"sessionId,omitempty"`
+	Payload   string  `json:"payload,omitempty"`
+	Shell     string  `json:"shell,omitempty"`
+	Cwd       string  `json:"cwd,omitempty"`
+	Cols      int     `json:"cols,omitempty"`
+	Rows      int     `json:"rows,omitempty"`
+	PublicKey string  `json:"publicKey,omitempty"` // ECDH P-256 public key (base64)
+	Hmac      string  `json:"hmac,omitempty"`      // HMAC-SHA256 for control messages
+	PingID    string  `json:"id,omitempty"`         // ping/pong correlation ID
+	Timestamp float64 `json:"timestamp,omitempty"`  // relay timestamp for RTT measurement
 }
 
 // Outgoing messages — each has its own struct for clean JSON marshaling.
@@ -63,4 +65,10 @@ type PtyReplayMsg struct {
 
 type HeartbeatMsg struct {
 	Type string `json:"type"`
+}
+
+type AgentPongMsg struct {
+	Type      string  `json:"type"`
+	ID        string  `json:"id"`
+	Timestamp float64 `json:"timestamp"`
 }

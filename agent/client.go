@@ -220,6 +220,12 @@ func (c *Client) readLoop() {
 			c.handlePtyClose(msg)
 		case "pty.replay.request":
 			c.handlePtyReplayRequest(msg)
+		case "agent.ping":
+			c.Send(AgentPongMsg{
+				Type:      "agent.pong",
+				ID:        msg.PingID,
+				Timestamp: msg.Timestamp,
+			})
 		default:
 			log.Printf("unknown message type: %s", msg.Type)
 		}

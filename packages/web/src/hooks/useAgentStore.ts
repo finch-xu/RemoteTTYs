@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { apiFetch } from '../lib/api';
-import type { AgentOnline } from '../lib/protocol';
+import type { AgentOnline, AgentLatency } from '../lib/protocol';
 
 export interface AgentInfo {
   id: string;
@@ -10,6 +10,7 @@ export interface AgentInfo {
   sessions: string[];
   lastSeen: string | null;
   identityKey: string | null;
+  latencyMs: number | null;
 }
 
 interface ApiAgent {
@@ -20,6 +21,7 @@ interface ApiAgent {
   sessions: string[];
   fingerprint: string | null;
   identityKey: string | null;
+  latencyMs: number | null;
   lastSeen: string | null;
   createdAt: string;
 }
@@ -47,6 +49,7 @@ export function useAgentStore(
           // Use identityKey from API (available for online agents), fall back to
           // WebSocket-delivered value, then null
           identityKey: a.identityKey || prevMap.get(a.id)?.identityKey || null,
+          latencyMs: a.latencyMs ?? prevMap.get(a.id)?.latencyMs ?? null,
         }));
       });
     } catch {
@@ -73,9 +76,21 @@ export function useAgentStore(
       fetchAgents();
     });
     const unsubOffline = subscribe('agent.offline', () => { fetchAgents(); });
+    const unsubLatency = subscribe('agent.latency', (msg: AgentLatency) => {
+      setAgents(prev => {
+        const idx = prev.findIndex(a => a.id === msg.agentId);
+        if (idx === -1) return prev;
+        const newLatency = msg.latencyMs !== null && msg.latencyMs > 0 ? msg.latencyMs : null;
+        if (prev[idx].latencyMs === newLatency) return prev;
+        const next = [...prev];
+        next[idx] = { ...prev[idx], latencyMs: newLatency };
+        return next;
+      });
+    });
     return () => {
       unsubOnline();
       unsubOffline();
+      unsubLatency();
     };
   }, [subscribe, fetchAgents]);
 
