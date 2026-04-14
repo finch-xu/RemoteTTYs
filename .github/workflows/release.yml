@@ -68,7 +68,7 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
           CERT_PATH="$RUNNER_TEMP/certificate.p12"
-          echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+          echo "$APPLE_CERTIFICATE" | base64 -d > "$CERT_PATH"
           security import "$CERT_PATH" \
             -P "$APPLE_CERTIFICATE_PASSWORD" \
             -A -t cert -f pkcs12 \
