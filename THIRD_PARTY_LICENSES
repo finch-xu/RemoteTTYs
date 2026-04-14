@@ -23,11 +23,12 @@ See full license text below.
 
 ================================================================================
 Cascadia Mono NF (Nerd Font)
-Source: https://github.com/ryanoasis/nerd-fonts (static file)
+Source: https://github.com/microsoft/cascadia-code
+Patched by: https://github.com/ryanoasis/nerd-fonts
 ================================================================================
 
-Base font — Copyright (c) Microsoft Corporation. (SIL OFL 1.1)
-Nerd Font patches — Copyright (c) Ryan McIntyre. (MIT)
+Copyright (c) 2019 - Present, Microsoft Corporation,
+with Reserved Font Name Cascadia Code.
 
 Licensed under the SIL Open Font License, Version 1.1.
 See full license text below.
@@ -37,8 +38,8 @@ Noto Sans Mono
 Source: @fontsource-variable/noto-sans-mono (npm)
 ================================================================================
 
-Copyright 2022 The Noto Project Authors
-  (https://github.com/notofonts/latin-greek-cyrillic)
+Copyright 2022 Google LLC
+  (https://fonts.google.com/noto/specimen/Noto+Sans+Mono)
 
 Licensed under the SIL Open Font License, Version 1.1.
 See full license text below.
