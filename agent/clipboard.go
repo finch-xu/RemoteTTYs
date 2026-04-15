@@ -12,7 +12,7 @@ import (
 func DetectClipboard() bool {
 	switch runtime.GOOS {
 	case "darwin":
-		_, err := exec.LookPath("pbcopy")
+		_, err := os.Stat("/usr/bin/pbcopy")
 		return err == nil
 	case "linux":
 		// Need a clipboard tool AND a display server

@@ -18,6 +18,7 @@ export interface AgentConnection {
   identityKey: string;
   latencyMs: number | null;
   pendingPing: { id: string; sentAt: number } | null;
+  capabilities: string[];
 }
 
 export interface PreAuth {
@@ -119,6 +120,7 @@ export function handleAgentConnection(ws: WebSocket, preAuth: PreAuth) {
         identityKey: (msg as AgentHello).identityKey || '',
         latencyMs: null,
         pendingPing: null,
+        capabilities: hello.capabilities ?? [],
       };
       // Close old connection if this agent is reconnecting before the old WS timed out
       const existingConn = agents.get(agentId);

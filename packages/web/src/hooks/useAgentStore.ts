@@ -23,6 +23,7 @@ interface ApiAgent {
   fingerprint: string | null;
   identityKey: string | null;
   latencyMs: number | null;
+  capabilities: string[];
   lastSeen: string | null;
   createdAt: string;
 }
@@ -51,7 +52,7 @@ export function useAgentStore(
           // WebSocket-delivered value, then null
           identityKey: a.identityKey || prevMap.get(a.id)?.identityKey || null,
           latencyMs: a.latencyMs ?? prevMap.get(a.id)?.latencyMs ?? null,
-          capabilities: prevMap.get(a.id)?.capabilities ?? [],
+          capabilities: a.capabilities ?? prevMap.get(a.id)?.capabilities ?? [],
         }));
       });
     } catch {

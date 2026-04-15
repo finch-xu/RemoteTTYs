@@ -355,6 +355,7 @@ app.get('/api/agents', standardLimiter, requireAuth, (req, res) => {
       fingerprint: a.fingerprint,
       identityKey: online?.identityKey ?? null,
       latencyMs: online?.latencyMs ?? null,
+      capabilities: online?.capabilities ?? [],
       lastSeen: a.last_seen,
       createdAt: a.created_at,
     };
