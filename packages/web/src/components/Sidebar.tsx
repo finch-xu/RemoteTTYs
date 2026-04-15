@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Settings, Sun, Moon, SunMoon, LogOut, ChevronLeft, ChevronRight, ScrollText, Users } from 'lucide-react';
 import type { AgentInfo } from '../hooks/useAgentStore';
 import { useTheme } from '../hooks/useTheme';
-import { UI_FONT, MONO_FONT } from '../lib/theme';
-import type { UITheme, UIThemeMode } from '../lib/theme';
+import { UI_FONT, MONO_FONT, getLatencyColor } from '../lib/theme';
+import type { UIThemeMode } from '../lib/theme';
 
 const SIDEBAR_WIDTH = 200;
 const SIDEBAR_COLLAPSED_WIDTH = 48;
@@ -28,13 +28,6 @@ function getOsLabel(os: string): string {
   if (os === 'linux') return 'Linux';
   if (os === 'windows') return 'Windows';
   return os;
-}
-
-function getLatencyColor(latencyMs: number | null, ui: UITheme): string {
-  if (latencyMs === null) return ui.textMuted;
-  if (latencyMs < 100) return ui.online;
-  if (latencyMs < 300) return ui.warning;
-  return ui.error;
 }
 
 const themeModeIcons: Record<UIThemeMode, typeof Sun> = {
@@ -74,7 +67,7 @@ export function Sidebar({ agents, selectedAgentId, onSelectAgent, currentView, o
     ...btnReset,
     display: 'flex', alignItems: 'center', gap: 8,
     width: `calc(100% - 12px)`,
-    padding: effectiveCollapsed ? '7px 0' : '7px 14px',
+    padding: effectiveCollapsed ? '10px 0' : '10px 14px',
     justifyContent: effectiveCollapsed ? 'center' : 'flex-start',
     borderRadius: 6, margin: '1px 6px',
     background: isActive ? ui.surfaceActive : isHovered ? ui.surfaceAlt : 'transparent',

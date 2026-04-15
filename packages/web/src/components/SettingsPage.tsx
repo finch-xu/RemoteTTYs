@@ -124,7 +124,7 @@ export function SettingsPage({ onAgentDeleted, userRole }: { onAgentDeleted?: ()
     <div style={{ flex: 1, padding: 'clamp(14px, 4vw, 28px)', overflow: 'auto', fontFamily: UI_FONT }}>
       {/* Terminal Theme Section */}
       <div style={{ marginBottom: 32 }}>
-        <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: ui.textPrimary }}>Terminal Theme</h2>
+        <h2 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 600, color: ui.textPrimary }}>Terminal Theme</h2>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           {terminalThemes.map(t => (
             <div
@@ -157,7 +157,7 @@ export function SettingsPage({ onAgentDeleted, userRole }: { onAgentDeleted?: ()
 
       {/* Terminal Font Section */}
       <div style={{ marginBottom: 32 }}>
-        <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: ui.textPrimary }}>Terminal Font</h2>
+        <h2 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 600, color: ui.textPrimary }}>Terminal Font</h2>
         <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           {/* Font Size */}
           <div style={{ minWidth: 200 }}>
@@ -219,7 +219,7 @@ export function SettingsPage({ onAgentDeleted, userRole }: { onAgentDeleted?: ()
 
       {/* Image Paste Section */}
       <div style={{ marginBottom: 32 }}>
-        <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: ui.textPrimary }}>Image Paste</h2>
+        <h2 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 600, color: ui.textPrimary }}>Image Paste</h2>
         <div style={{ marginBottom: 16 }}>
           <label style={{ fontSize: 13, color: ui.textSecondary, display: 'block', marginBottom: 10 }}>
             Allowed image types for clipboard transfer:
@@ -265,8 +265,8 @@ export function SettingsPage({ onAgentDeleted, userRole }: { onAgentDeleted?: ()
 
       {/* Agent Tokens Section */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: ui.textPrimary }}>Agent Tokens</h2>
-        <button style={{ background: ui.accent, border: 'none', borderRadius: 8, color: ui.accentText, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', fontWeight: 500 }} onClick={() => setShowCreate(true)}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: ui.textPrimary }}>Agent Tokens</h2>
+        <button style={{ background: ui.accent, border: 'none', borderRadius: 6, color: ui.accentText, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', fontWeight: 500 }} onClick={() => setShowCreate(true)}>
           + New Token
         </button>
       </div>
@@ -323,7 +323,7 @@ export function SettingsPage({ onAgentDeleted, userRole }: { onAgentDeleted?: ()
       {/* Server Key Section */}
       {serverKey && (
         <div style={{ marginTop: 32 }}>
-          <h2 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600, color: ui.textPrimary }}>Server Public Key</h2>
+          <h2 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 600, color: ui.textPrimary }}>Server Public Key</h2>
           <p style={{ fontSize: 13, color: ui.textSecondary, margin: '0 0 8px' }}>
             Add this key to your agent's config.yaml as <code style={{ fontFamily: MONO_FONT }}>server_key</code> to enable server identity verification.
           </p>
@@ -345,7 +345,7 @@ export function SettingsPage({ onAgentDeleted, userRole }: { onAgentDeleted?: ()
 
       {/* Registered Agents Section */}
       <div style={{ marginTop: 32 }}>
-        <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: ui.textPrimary }}>Registered Agents</h2>
+        <h2 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 600, color: ui.textPrimary }}>Registered Agents</h2>
         {agents.length === 0 ? (
           <div style={{ color: ui.textMuted, fontSize: 13, textAlign: 'center', marginTop: 20 }}>
             No agents registered yet.

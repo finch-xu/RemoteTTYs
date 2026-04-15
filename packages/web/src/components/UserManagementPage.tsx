@@ -62,7 +62,7 @@ export function UserManagementPage() {
   return (
     <div style={{ flex: 1, padding: 'clamp(14px, 4vw, 28px)', overflow: 'auto', fontFamily: UI_FONT }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h2 style={{ margin: 0, color: ui.textPrimary, fontSize: 20, fontWeight: 600 }}>User Management</h2>
+        <h2 style={{ margin: 0, color: ui.textPrimary, fontSize: 18, fontWeight: 600 }}>User Management</h2>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={fetchUsers}
@@ -209,7 +209,7 @@ function CreateUserDialog({ onCreated, onCancel }: { onCreated: () => void; onCa
         {error && <div style={{ color: ui.error, fontSize: 13, marginBottom: 8 }}>{error}</div>}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
           <button style={{ background: 'none', border: `1px solid ${ui.border}`, borderRadius: 6, color: ui.textSecondary, padding: '7px 18px', cursor: 'pointer', fontSize: 13 }} onClick={onCancel}>Cancel</button>
-          <button style={{ background: ui.accent, border: 'none', borderRadius: 6, color: ui.accentText, padding: '7px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }} onClick={handleCreate} disabled={loading}>
+          <button style={{ background: ui.accent, border: 'none', borderRadius: 6, color: ui.accentText, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500, opacity: loading ? 0.6 : 1 }} onClick={handleCreate} disabled={loading}>
             {loading ? 'Creating...' : 'Create'}
           </button>
         </div>
@@ -257,7 +257,7 @@ function ResetPasswordDialog({ username, onDone, onCancel }: { username: string;
         {error && <div style={{ color: ui.error, fontSize: 13, marginBottom: 8 }}>{error}</div>}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
           <button style={{ background: 'none', border: `1px solid ${ui.border}`, borderRadius: 6, color: ui.textSecondary, padding: '7px 18px', cursor: 'pointer', fontSize: 13 }} onClick={onCancel}>Cancel</button>
-          <button style={{ background: ui.accent, border: 'none', borderRadius: 6, color: ui.accentText, padding: '7px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }} onClick={handleReset} disabled={loading}>
+          <button style={{ background: ui.accent, border: 'none', borderRadius: 6, color: ui.accentText, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500, opacity: loading ? 0.6 : 1 }} onClick={handleReset} disabled={loading}>
             {loading ? 'Saving...' : 'Reset Password'}
           </button>
         </div>

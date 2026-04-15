@@ -164,7 +164,7 @@ export function AuditLogPage({ userRole }: { userRole: string }) {
   return (
     <div style={{ flex: 1, padding: 'clamp(14px, 4vw, 28px)', overflow: 'auto', fontFamily: UI_FONT }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '0 0 20px' }}>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: ui.textPrimary }}>Audit Log</h2>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: ui.textPrimary }}>Audit Log</h2>
         <button
           onClick={() => fetchLogs(undefined, undefined, true)}
           disabled={loading}

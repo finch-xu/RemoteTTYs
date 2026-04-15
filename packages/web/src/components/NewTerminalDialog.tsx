@@ -52,7 +52,7 @@ export function NewTerminalDialog({ onSubmit, onCancel }: NewTerminalDialogProps
           </label>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
             <button style={{ background: 'none', border: `1px solid ${ui.border}`, borderRadius: 6, color: ui.textSecondary, padding: '7px 18px', cursor: 'pointer', fontSize: 13 }} onClick={onCancel}>Cancel</button>
-            <button style={{ background: ui.accent, border: 'none', borderRadius: 6, color: ui.accentText, padding: '7px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }} onClick={() => onSubmit(shell, cwd)}>Create</button>
+            <button style={{ background: ui.accent, border: 'none', borderRadius: 6, color: ui.accentText, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }} onClick={() => onSubmit(shell, cwd)}>Create</button>
           </div>
         </div>
       </div>

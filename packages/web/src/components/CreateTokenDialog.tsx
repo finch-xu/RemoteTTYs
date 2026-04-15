@@ -73,7 +73,7 @@ export function CreateTokenDialog({ onCreated, onCancel }: CreateTokenDialogProp
             <button style={{ background: ui.surfaceAlt, border: `1px solid ${ui.border}`, borderRadius: 6, color: ui.textPrimary, padding: '7px 18px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }} onClick={handleCopy}>
               {copied ? <><Check size={14} strokeWidth={2} color={ui.online} /> Copied!</> : 'Copy to Clipboard'}
             </button>
-            <button style={{ background: ui.accent, border: 'none', borderRadius: 6, color: ui.accentText, padding: '7px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }} onClick={onCreated}>Done</button>
+            <button style={{ background: ui.accent, border: 'none', borderRadius: 6, color: ui.accentText, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }} onClick={onCreated}>Done</button>
           </div>
           <p style={{ fontSize: 12, color: ui.textMuted, margin: '12px 0 0' }}>
             Paste this into your agent's config.yaml as the "token" field.
@@ -98,7 +98,7 @@ export function CreateTokenDialog({ onCreated, onCancel }: CreateTokenDialogProp
         {error && <div style={{ color: ui.error, fontSize: 13 }}>{error}</div>}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
           <button style={{ background: 'none', border: `1px solid ${ui.border}`, borderRadius: 6, color: ui.textSecondary, padding: '7px 18px', cursor: 'pointer', fontSize: 13 }} onClick={onCancel}>Cancel</button>
-          <button style={{ background: ui.accent, border: 'none', borderRadius: 6, color: ui.accentText, padding: '7px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }} onClick={handleCreate} disabled={loading}>
+          <button style={{ background: ui.accent, border: 'none', borderRadius: 6, color: ui.accentText, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500, opacity: loading ? 0.6 : 1 }} onClick={handleCreate} disabled={loading}>
             {loading ? 'Creating...' : 'Create'}
           </button>
         </div>

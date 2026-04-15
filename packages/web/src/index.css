@@ -108,6 +108,15 @@ button, a, [role="button"] {
   }
 }
 
+/* Respect prefers-reduced-motion: disable animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Fix: hide IME composition artifacts in ghostty-web terminal containers.
    ghostty-web sets contenteditable="true" on the container div, causing
    browser-rendered IME composition text to appear as a visible white bar. */

@@ -305,6 +305,8 @@ function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLog
               send={send}
               subscribe={subscribe}
               compact={drawerMode}
+              agentLatencyMs={agent.latencyMs}
+              relayLatencyMs={relayLatencyMs}
             />
           </div>
         ))}

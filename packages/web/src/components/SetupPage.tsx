@@ -58,11 +58,20 @@ export function SetupPage({ onSetupComplete }: SetupPageProps) {
         <p style={{ color: t.textSecondary, fontSize: 13, margin: '0 0 12px' }}>
           Create your admin account to get started.
         </p>
-        <input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder="Username" style={inputStyle} autoFocus />
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" style={inputStyle} />
-        <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Confirm Password" style={inputStyle} />
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: t.textSecondary }}>
+          Username
+          <input type="text" value={username} onChange={e => setUsername(e.target.value)} style={inputStyle} autoFocus />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: t.textSecondary }}>
+          Password
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: t.textSecondary }}>
+          Confirm Password
+          <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle} />
+        </label>
         {error && <div style={{ color: t.error, fontSize: 13 }}>{error}</div>}
-        <button type="submit" style={{ background: t.accent, border: 'none', borderRadius: 8, color: t.accentText, padding: '10px', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, fontWeight: 500 }} disabled={loading}>
+        <button type="submit" style={{ background: t.accent, border: 'none', borderRadius: 8, color: t.accentText, padding: '10px', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, fontWeight: 500, opacity: loading ? 0.6 : 1 }} disabled={loading}>
           {loading ? 'Creating...' : 'Create Admin Account'}
         </button>
       </form>

@@ -3,7 +3,7 @@ import { X, Plus, Columns2 } from 'lucide-react';
 import { TerminalView } from './TerminalView';
 import { NewTerminalDialog } from './NewTerminalDialog';
 import { useTheme } from '../hooks/useTheme';
-import { MONO_FONT } from '../lib/theme';
+import { MONO_FONT, getLatencyColor } from '../lib/theme';
 import { generateECDHKeyPair, exportPublicKeyRaw, uint8ToBase64, computeCloseHMAC } from '../lib/e2e';
 import type { E2EKeyPairData } from '../lib/e2e';
 import type { PtyCreated, PtyExited, PtyCreateError, AgentOffline } from '../lib/protocol';
@@ -31,9 +31,11 @@ interface TerminalTabsProps {
   send: (msg: object) => void;
   subscribe: (type: string, handler: (msg: any) => void) => () => void;
   compact?: boolean;
+  agentLatencyMs: number | null;
+  relayLatencyMs: number | null;
 }
 
-export function TerminalTabs({ agentId, agentName, identityKey, existingSessions, clipboardAvailable, send, subscribe, compact }: TerminalTabsProps) {
+export function TerminalTabs({ agentId, agentName, identityKey, existingSessions, clipboardAvailable, send, subscribe, compact, agentLatencyMs, relayLatencyMs }: TerminalTabsProps) {
   const { ui } = useTheme();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -310,18 +312,19 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
     <div
       key={s.sessionId}
       style={{
-        display: 'flex', alignItems: 'center', gap: 4, padding: compact ? '8px 14px' : '5px 14px', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 6, padding: compact ? '10px 14px' : '7px 14px', cursor: 'pointer',
         fontSize: 13, fontFamily: MONO_FONT, whiteSpace: 'nowrap', userSelect: 'none', borderRadius: '6px 6px 0 0',
         background: isActive ? ui.bg : 'transparent',
         color: s.exited ? ui.textMuted : ui.textPrimary,
         borderBottom: isActive ? `2px solid ${ui.accent}` : '2px solid transparent',
+        transition: 'background-color 0.15s ease, border-color 0.15s ease',
       }}
       onClick={onActivate}
     >
       <span>{s.label}</span>
       {s.exited && <span style={{ color: ui.textMuted, fontSize: 10, marginLeft: 4 }}>exited</span>}
       <button
-        style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', padding: compact ? '4px' : '0 2px', marginLeft: 4, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+        style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', padding: compact ? '6px' : '4px', marginLeft: 2, lineHeight: 1, display: 'flex', alignItems: 'center' }}
         onClick={(e) => { e.stopPropagation(); handleCloseTab(s.sessionId); }}
         title="Close terminal"
         aria-label="Close terminal"
@@ -337,6 +340,7 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
         display: 'flex', alignItems: 'center', gap: 2, overflow: 'auto', padding: '0 4px',
         flex: 1, minWidth: 0,
         borderBottom: focusedPane === pane ? `2px solid ${ui.accent}` : '2px solid transparent',
+        transition: 'border-color 0.15s ease',
       }}
       onClick={() => setFocusedPane(pane)}
     >
@@ -346,7 +350,7 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
         setFocusedPane(pane);
       }))}
       <button
-        style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', padding: compact ? '6px 10px' : '2px 10px', lineHeight: 1, display: 'flex', alignItems: 'center' }}
+        style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', padding: compact ? '10px' : '6px 10px', lineHeight: 1, display: 'flex', alignItems: 'center' }}
         onClick={() => { setFocusedPane(pane); setShowNewDialog(true); }}
         title="New terminal"
         aria-label={`New terminal (${pane} pane)`}
@@ -357,6 +361,8 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
   );
 
   const canSplit = sessions.length >= 2 && !compact;
+  const totalLatencyMs = agentLatencyMs !== null ? agentLatencyMs + (relayLatencyMs ?? 0) : null;
+  const latencyColor = getLatencyColor(totalLatencyMs, ui);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
@@ -371,7 +377,7 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
           <div style={{ display: 'flex', alignItems: 'center', gap: 2, overflow: 'auto', padding: '0 4px', flex: 1, minWidth: 0 }}>
             {sessions.map(s => renderTab(s, s.sessionId === activeSessionId, () => setActiveSessionId(s.sessionId)))}
             <button
-              style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', padding: compact ? '6px 10px' : '2px 10px', lineHeight: 1, display: 'flex', alignItems: 'center' }}
+              style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', padding: compact ? '10px' : '6px 10px', lineHeight: 1, display: 'flex', alignItems: 'center' }}
               onClick={() => setShowNewDialog(true)}
               title="New terminal"
               aria-label="New terminal"
@@ -395,6 +401,20 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
             >
               <Columns2 size={16} strokeWidth={1.75} />
             </button>
+          )}
+          {!compact && totalLatencyMs !== null && (
+            <div
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginRight: 4, lineHeight: 1.2 }}
+              title={`Web \u2194 Relay: ${relayLatencyMs ?? '?'}ms\nRelay \u2194 Agent: ${agentLatencyMs}ms`}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontFamily: MONO_FONT }}>
+                <span style={{ color: latencyColor, fontSize: 8 }}>{'\u25cf'}</span>
+                <span style={{ color: latencyColor, fontWeight: 500 }}>{totalLatencyMs}ms</span>
+              </div>
+              <div style={{ fontSize: 10, color: ui.textMuted, fontFamily: MONO_FONT }}>
+                W:{relayLatencyMs ?? '?'} A:{agentLatencyMs}
+              </div>
+            </div>
           )}
           {!compact && (
             <span style={{ color: ui.textSecondary, fontSize: 12, fontFamily: MONO_FONT }}>

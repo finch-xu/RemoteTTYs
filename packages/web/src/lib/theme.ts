@@ -1,3 +1,5 @@
+import type React from 'react';
+
 // --- UI Theme ---
 
 export interface UITheme {
@@ -44,7 +46,7 @@ export const darkTheme: UITheme = {
   border: '#404040',
   textPrimary: '#E5E5E5',
   textSecondary: '#999999',
-  textMuted: '#666666',
+  textMuted: '#808080',
   accent: '#D4845A',
   accentHover: '#E0956B',
   accentText: '#FFFFFF',
@@ -201,4 +203,48 @@ export const DEFAULT_TERMINAL_THEME = 'warm-night';
 
 export function getTerminalTheme(id: string): TerminalTheme {
   return terminalThemes.find(t => t.id === id) ?? terminalThemes[0];
+}
+
+// --- Shared UI Styles ---
+
+export const HEADING = {
+  page: { fontSize: 18, fontWeight: 600 } as const,
+  section: { fontSize: 16, fontWeight: 600 } as const,
+  sectionLabel: { fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' as const } as const,
+};
+
+export function btnPrimary(ui: UITheme): React.CSSProperties {
+  return {
+    background: ui.accent, border: 'none', borderRadius: 6, color: ui.accentText,
+    padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', fontWeight: 500,
+  };
+}
+
+export function btnSecondary(ui: UITheme): React.CSSProperties {
+  return {
+    background: 'none', border: `1px solid ${ui.border}`, borderRadius: 6, color: ui.textSecondary,
+    padding: '7px 17px', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+  };
+}
+
+export function btnDanger(ui: UITheme): React.CSSProperties {
+  return {
+    background: ui.error, border: 'none', borderRadius: 6, color: '#FFFFFF',
+    padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', fontWeight: 500,
+  };
+}
+
+export function inputStyle(ui: UITheme): React.CSSProperties {
+  return {
+    padding: '8px 12px', borderRadius: 6, fontSize: 13, fontFamily: 'inherit',
+    border: `1px solid ${ui.border}`, background: ui.bg, color: ui.textPrimary,
+    boxSizing: 'border-box', width: '100%',
+  };
+}
+
+export function getLatencyColor(latencyMs: number | null, ui: UITheme): string {
+  if (latencyMs === null) return ui.textMuted;
+  if (latencyMs < 100) return ui.online;
+  if (latencyMs < 300) return ui.warning;
+  return ui.error;
 }
