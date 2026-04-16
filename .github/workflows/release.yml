@@ -145,6 +145,8 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: \
             -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security default-keychain -d user -s "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
 
       - name: Build Go universal binary
         env:
@@ -161,8 +163,8 @@ jobs:
             -output ../agent-mac/RttysAgent/Resources/rttys-agent
           chmod +x ../agent-mac/RttysAgent/Resources/rttys-agent
 
-      - name: Select latest Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+      - name: Select Xcode 26.2
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app
 
       - name: Resolve SPM dependencies
         run: |
@@ -174,6 +176,7 @@ jobs:
       - name: Archive Xcode project
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
           cd agent-mac
           xcodebuild archive \
@@ -184,14 +187,50 @@ jobs:
             MARKETING_VERSION="${{ steps.version.outputs.version }}" \
             CURRENT_PROJECT_VERSION="${{ steps.version.outputs.build_number }}" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CODE_SIGN_IDENTITY="${{ secrets.APPLE_SIGNING_IDENTITY }}"
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="$APPLE_SIGNING_IDENTITY" \
+            PROVISIONING_PROFILE_SPECIFIER=""
 
       - name: Export archive
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          EXPORT_PLIST="$RUNNER_TEMP/ExportOptions.plist"
+          sed "s/__APPLE_TEAM_ID__/$APPLE_TEAM_ID/g" agent-mac/ExportOptions.plist > "$EXPORT_PLIST"
           xcodebuild -exportArchive \
             -archivePath build/RttysAgent.xcarchive \
             -exportPath build/export \
-            -exportOptionsPlist agent-mac/ExportOptions.plist
+            -exportOptionsPlist "$EXPORT_PLIST"
+
+      - name: Inject and sign rttys-agent
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+          EXPECTED_BUILD: ${{ steps.version.outputs.build_number }}
+        run: |
+          APP="build/export/RttysAgent.app"
+          if [ ! -d "$APP" ]; then
+            echo "::error::Exported app not found at $APP"
+            ls -la build/export/ || true
+            exit 1
+          fi
+          ACTUAL_VERSION=$(plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist")
+          ACTUAL_BUILD=$(plutil -extract CFBundleVersion raw "$APP/Contents/Info.plist")
+          if [ "$ACTUAL_VERSION" != "$EXPECTED_VERSION" ] || [ "$ACTUAL_BUILD" != "$EXPECTED_BUILD" ]; then
+            echo "::error::Info.plist version mismatch — got ${ACTUAL_VERSION}(${ACTUAL_BUILD}), want ${EXPECTED_VERSION}(${EXPECTED_BUILD})"
+            exit 1
+          fi
+          mkdir -p "$APP/Contents/Resources"
+          cp agent-mac/RttysAgent/Resources/rttys-agent "$APP/Contents/Resources/rttys-agent"
+          chmod +x "$APP/Contents/Resources/rttys-agent"
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" \
+            --options runtime --timestamp \
+            "$APP/Contents/Resources/rttys-agent"
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" \
+            --options runtime --timestamp \
+            --entitlements agent-mac/RttysAgent/RttysAgent.entitlements \
+            "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
 
       - name: Notarize app
         env:
@@ -221,11 +260,19 @@ jobs:
           SPARKLE_BIN=$(find ~/Library/Developer/Xcode/DerivedData -path "*/Sparkle/bin/sign_update" -type f 2>/dev/null | head -1)
           if [ -z "$SPARKLE_BIN" ]; then
             mkdir -p /tmp/sparkle
-            curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/2.6.4/Sparkle-2.6.4.tar.xz" | tar xJ -C /tmp/sparkle
+            curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/2.9.1/Sparkle-2.9.1.tar.xz" | tar xJ -C /tmp/sparkle
             SPARKLE_BIN="/tmp/sparkle/bin/sign_update"
           fi
-          SIGN_OUTPUT=$(echo "$SPARKLE_PRIVATE_KEY" | "$SPARKLE_BIN" build/RttysAgent.zip)
+          KEY_FILE="$RUNNER_TEMP/sparkle_ed25519_key"
+          umask 077
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
+          SIGN_OUTPUT=$("$SPARKLE_BIN" -f "$KEY_FILE" build/RttysAgent.zip)
+          rm -f "$KEY_FILE"
           ED_SIGNATURE=$(echo "$SIGN_OUTPUT" | sed -n 's/.*edSignature="\([^"]*\)".*/\1/p')
+          if [ -z "$ED_SIGNATURE" ]; then
+            echo "::error::Failed to extract Sparkle edSignature from output: $SIGN_OUTPUT"
+            exit 1
+          fi
           echo "ed_signature=$ED_SIGNATURE" >> "$GITHUB_OUTPUT"
 
       - name: Generate appcast.xml
