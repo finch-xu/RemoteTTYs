@@ -154,11 +154,12 @@ jobs:
           VERSION="${{ steps.version.outputs.tag }}"
           COMMIT="${{ steps.version.outputs.commit }}"
           LDFLAGS="-s -w -X main.Version=${VERSION} -X main.GitCommit=${COMMIT} -X main.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          mkdir -p ../build ../agent-mac/RttysAgent/Resources
           GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o ../build/rttys-agent-arm64 .
           GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o ../build/rttys-agent-amd64 .
           lipo -create ../build/rttys-agent-arm64 ../build/rttys-agent-amd64 \
-            -output agent-mac/RttysAgent/Resources/rttys-agent
-          chmod +x agent-mac/RttysAgent/Resources/rttys-agent
+            -output ../agent-mac/RttysAgent/Resources/rttys-agent
+          chmod +x ../agent-mac/RttysAgent/Resources/rttys-agent
 
       - name: Resolve SPM dependencies
         run: |

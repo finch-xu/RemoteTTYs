@@ -46,7 +46,7 @@ interface TerminalViewProps {
   onE2EEstablished?: (sessionId: string, hmacKey: CryptoKey) => void;
 }
 
-export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdhKeyPair, agentPublicKey, agentSignature, clipboardAvailable, send, subscribe, onE2EEstablished }: TerminalViewProps) {
+export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdhKeyPair, agentPublicKey, agentSignature, send, subscribe, onE2EEstablished }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const e2eRef = useRef<E2ESession | null>(null);
@@ -234,7 +234,7 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
 
       if (canvas) {
         function cellCoords(event: MouseEvent) {
-          const rect = canvas.getBoundingClientRect();
+          const rect = canvas!.getBoundingClientRect();
           const charW = term.renderer?.charWidth ?? 8;
           const charH = term.renderer?.charHeight ?? 16;
           return {
