@@ -64,7 +64,7 @@
 服务端（relay + web UI）以单个 Docker 容器运行。
 
 ```bash
-git clone https://github.com/finchxu/RemoteTTYs.git
+git clone https://github.com/finch-xu/RemoteTTYs.git
 cd RemoteTTYs
 docker compose up -d
 ```
@@ -104,7 +104,7 @@ Agent 是一个单文件 Go 二进制，运行在你的本地机器上。
 
 ### 1. 下载
 
-前往 [Releases](https://github.com/finchxu/RemoteTTYs/releases) 页面，下载对应平台的二进制文件：
+前往 [Releases](https://github.com/finch-xu/RemoteTTYs/releases) 页面，下载对应平台的二进制文件：
 
 | 平台 | 文件名 |
 |------|--------|

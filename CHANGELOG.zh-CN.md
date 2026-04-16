@@ -5,7 +5,7 @@ RemoteTTYs 的所有重要变更都会记录在本文件中。
 本文件格式基于 [Keep a Changelog 1.1](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-`v0.5.0` 之前的发布历史可在 [Git tags](https://github.com/finchxu/RemoteTTYs/tags) 中查看。
+`v0.5.0` 之前的发布历史可在 [Git tags](https://github.com/finch-xu/RemoteTTYs/tags) 中查看。
 
 **[English version](CHANGELOG.md)**
 
@@ -45,5 +45,5 @@ RemoteTTYs 的所有重要变更都会记录在本文件中。
 - `.app` 内嵌的 Go helper（`rttys-agent`）未被 codesign — 这是 Hardened Runtime 的硬性要求，也是公证无法通过的障碍。现已使用 `--options runtime` + secure timestamp 单独签名，并在注入后以 entitlements 对整个 bundle 重签。
 - 发布工作流的 TypeScript 错误（`TerminalView` 中未使用的解构变量、受保护 `canvas` 代码块中缺失的非空断言）以及 `lipo` 输出路径错误。
 
-[Unreleased]: https://github.com/finchxu/RemoteTTYs/compare/v0.5.0-beta-5...HEAD
-[0.5.0-beta-5]: https://github.com/finchxu/RemoteTTYs/releases/tag/v0.5.0-beta-5
+[Unreleased]: https://github.com/finch-xu/RemoteTTYs/compare/v0.5.0-beta-5...HEAD
+[0.5.0-beta-5]: https://github.com/finch-xu/RemoteTTYs/releases/tag/v0.5.0-beta-5

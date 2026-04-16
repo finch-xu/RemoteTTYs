@@ -64,7 +64,7 @@ Local Machine(s)              Remote Server                Browser(s)
 The server (relay + web UI) runs as a single Docker container.
 
 ```bash
-git clone https://github.com/finchxu/RemoteTTYs.git
+git clone https://github.com/finch-xu/RemoteTTYs.git
 cd RemoteTTYs
 docker compose up -d
 ```
@@ -104,7 +104,7 @@ The agent is a single Go binary that runs on your local machines.
 
 ### 1. Download
 
-Go to the [Releases](https://github.com/finchxu/RemoteTTYs/releases) page and download the binary for your platform:
+Go to the [Releases](https://github.com/finch-xu/RemoteTTYs/releases) page and download the binary for your platform:
 
 | Platform | File |
 |----------|------|

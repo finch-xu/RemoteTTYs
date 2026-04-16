@@ -1,4 +1,4 @@
-module github.com/finchxu/RemoteTTYs/agent
+module github.com/finch-xu/RemoteTTYs/agent
 
 go 1.26.1
 

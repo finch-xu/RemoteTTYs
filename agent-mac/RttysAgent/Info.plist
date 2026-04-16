@@ -5,7 +5,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://github.com/finchxu/RemoteTTYs/releases/latest/download/appcast.xml</string>
+	<string>https://github.com/finch-xu/RemoteTTYs/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>RjJGwja1PTVIdFPXRGg3Nk8SEeIXgZal4o4/7fJByBo=</string>
 </dict>

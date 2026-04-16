@@ -5,7 +5,7 @@ All notable changes to RemoteTTYs are documented in this file.
 The format is based on [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Release history prior to `v0.5.0` is available via [Git tags](https://github.com/finchxu/RemoteTTYs/tags).
+Release history prior to `v0.5.0` is available via [Git tags](https://github.com/finch-xu/RemoteTTYs/tags).
 
 **[中文版 / Chinese](CHANGELOG.zh-CN.md)**
 
@@ -46,5 +46,5 @@ the macOS app release pipeline from "experimental" to "production-ready".
 - Embedded Go helper (`rttys-agent`) inside the `.app` was not being codesigned — a requirement under Hardened Runtime and a blocker for notarization. Now independently signed with `--options runtime` + secure timestamp, and the whole bundle is re-sealed with entitlements after injection.
 - Release workflow TypeScript errors (unused destructure in `TerminalView`, missing non-null assertion inside a guarded `canvas` block) and incorrect `lipo` output path.
 
-[Unreleased]: https://github.com/finchxu/RemoteTTYs/compare/v0.5.0-beta-5...HEAD
-[0.5.0-beta-5]: https://github.com/finchxu/RemoteTTYs/releases/tag/v0.5.0-beta-5
+[Unreleased]: https://github.com/finch-xu/RemoteTTYs/compare/v0.5.0-beta-5...HEAD
+[0.5.0-beta-5]: https://github.com/finch-xu/RemoteTTYs/releases/tag/v0.5.0-beta-5
