@@ -176,5 +176,10 @@ go.work.sum
 mydata/
 docs/
 
+# macOS agent app
+agent-mac/RttysAgent/Resources/rttys-agent
+agent-mac/build/
+agent-mac/DerivedData/
+
 CLAUDE.md
 .DS_Store

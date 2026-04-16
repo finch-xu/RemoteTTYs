@@ -105,15 +105,157 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/remotettys:${{ steps.version.outputs.tag }}
             ghcr.io/${{ github.repository_owner }}/remotettys:latest
 
+  build-macos-app:
+    name: Build macOS App
+    runs-on: macos-14
+    environment: APPLE_CERTIFICATE
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Extract version info
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          COMMIT="${GITHUB_SHA::8}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          BUILD_NUMBER=$(( ${MAJOR:-0} * 10000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Import Apple certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+      - name: Build Go universal binary
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          cd agent
+          VERSION="${{ steps.version.outputs.tag }}"
+          COMMIT="${{ steps.version.outputs.commit }}"
+          LDFLAGS="-s -w -X main.Version=${VERSION} -X main.GitCommit=${COMMIT} -X main.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o ../build/rttys-agent-arm64 .
+          GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o ../build/rttys-agent-amd64 .
+          lipo -create ../build/rttys-agent-arm64 ../build/rttys-agent-amd64 \
+            -output agent-mac/RttysAgent/Resources/rttys-agent
+          chmod +x agent-mac/RttysAgent/Resources/rttys-agent
+
+      - name: Resolve SPM dependencies
+        run: |
+          cd agent-mac
+          xcodebuild -resolvePackageDependencies \
+            -project RttysAgent.xcodeproj \
+            -scheme RttysAgent
+
+      - name: Archive Xcode project
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cd agent-mac
+          xcodebuild archive \
+            -project RttysAgent.xcodeproj \
+            -scheme RttysAgent \
+            -configuration Release \
+            -archivePath ../build/RttysAgent.xcarchive \
+            MARKETING_VERSION="${{ steps.version.outputs.version }}" \
+            CURRENT_PROJECT_VERSION="${{ steps.version.outputs.build_number }}" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_IDENTITY="${{ secrets.APPLE_SIGNING_IDENTITY }}"
+
+      - name: Export archive
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath build/RttysAgent.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist agent-mac/ExportOptions.plist
+
+      - name: Notarize app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          ditto -c -k --keepParent build/export/RttysAgent.app build/RttysAgent-notarize.zip
+          xcrun notarytool submit build/RttysAgent-notarize.zip \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple build/export/RttysAgent.app
+
+      - name: Package for Sparkle
+        id: package
+        run: |
+          ditto -c -k --keepParent build/export/RttysAgent.app build/RttysAgent.zip
+          echo "file_size=$(stat -f%z build/RttysAgent.zip)" >> "$GITHUB_OUTPUT"
+
+      - name: EdDSA sign for Sparkle
+        id: sparkle_sign
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          SPARKLE_BIN=$(find ~/Library/Developer/Xcode/DerivedData -path "*/Sparkle/bin/sign_update" -type f 2>/dev/null | head -1)
+          if [ -z "$SPARKLE_BIN" ]; then
+            mkdir -p /tmp/sparkle
+            curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/2.6.4/Sparkle-2.6.4.tar.xz" | tar xJ -C /tmp/sparkle
+            SPARKLE_BIN="/tmp/sparkle/bin/sign_update"
+          fi
+          SIGN_OUTPUT=$(echo "$SPARKLE_PRIVATE_KEY" | "$SPARKLE_BIN" build/RttysAgent.zip)
+          ED_SIGNATURE=$(echo "$SIGN_OUTPUT" | sed -n 's/.*edSignature="\([^"]*\)".*/\1/p')
+          echo "ed_signature=$ED_SIGNATURE" >> "$GITHUB_OUTPUT"
+
+      - name: Generate appcast.xml
+        run: |
+          PUB_DATE=$(date -R)
+          sed \
+            -e "s|SPARKLE_VERSION|${{ steps.version.outputs.version }}|g" \
+            -e "s|SPARKLE_BUILD_NUMBER|${{ steps.version.outputs.build_number }}|g" \
+            -e "s|SPARKLE_TAG|${{ steps.version.outputs.tag }}|g" \
+            -e "s|SPARKLE_PUB_DATE|${PUB_DATE}|g" \
+            -e "s|SPARKLE_FILE_SIZE|${{ steps.package.outputs.file_size }}|g" \
+            -e "s|SPARKLE_ED_SIGNATURE|${{ steps.sparkle_sign.outputs.ed_signature }}|g" \
+            agent-mac/appcast-template.xml > build/appcast.xml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: |
+            build/RttysAgent.zip
+            build/appcast.xml
+
+      - name: Cleanup keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true
+
   release:
     name: Create Release
-    needs: [build-agent, build-relay]
+    needs: [build-agent, build-relay, build-macos-app]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: rttys-*
+          pattern: '{rttys-*,macos-app}'
           merge-multiple: false
       - name: Create release
         uses: softprops/action-gh-release@v2
@@ -121,4 +263,6 @@ jobs:
           files: |
             artifacts/rttys-agent-*/rttys-agent-*
             artifacts/rttys-relay/rttys-relay.tar.gz
+            artifacts/macos-app/RttysAgent.zip
+            artifacts/macos-app/appcast.xml
           generate_release_notes: true

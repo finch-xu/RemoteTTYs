@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>RttysAgent</title>
+    <link>https://github.com/finchxu/RemoteTTYs</link>
+    <description>RttysAgent macOS app updates</description>
+    <language>en</language>
+    <item>
+      <title>Version SPARKLE_VERSION</title>
+      <sparkle:version>SPARKLE_BUILD_NUMBER</sparkle:version>
+      <sparkle:shortVersionString>SPARKLE_VERSION</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <pubDate>SPARKLE_PUB_DATE</pubDate>
+      <enclosure
+        url="https://github.com/finchxu/RemoteTTYs/releases/download/SPARKLE_TAG/RttysAgent.zip"
+        length="SPARKLE_FILE_SIZE"
+        type="application/octet-stream"
+        sparkle:edSignature="SPARKLE_ED_SIGNATURE" />
+    </item>
+  </channel>
+</rss>
