@@ -107,7 +107,7 @@ jobs:
 
   build-macos-app:
     name: Build macOS App
-    runs-on: macos-14
+    runs-on: macos-26
     environment: APPLE_CERTIFICATE
     steps:
       - uses: actions/checkout@v4
@@ -160,6 +160,9 @@ jobs:
           lipo -create ../build/rttys-agent-arm64 ../build/rttys-agent-amd64 \
             -output ../agent-mac/RttysAgent/Resources/rttys-agent
           chmod +x ../agent-mac/RttysAgent/Resources/rttys-agent
+
+      - name: Select latest Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
 
       - name: Resolve SPM dependencies
         run: |
