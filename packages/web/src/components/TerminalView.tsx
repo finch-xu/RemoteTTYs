@@ -205,27 +205,90 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
         return false;
       });
 
-      // Fix: Forward mouse wheel events as SGR mouse protocol when TUI apps
-      // enable mouse tracking (e.g. Claude Code, vim). ghostty-web defaults to
-      // sending arrow keys in alternate screen, which doesn't work for apps
-      // that use mouse-based scrolling.
-      term.attachCustomWheelEventHandler((event: WheelEvent) => {
-        if (!term.hasMouseTracking()) return false;
+      // --- SGR mouse protocol (workaround: ghostty-web v0.4 lacks native mouse input forwarding) ---
+      // TUI apps (Claude Code, vim, etc.) enable mouse tracking via DEC modes 1000/1002/1003,
+      // but ghostty-web only detects these modes — it doesn't convert DOM events to SGR sequences.
+      // Remove this block when ghostty-web adds native mouse protocol support.
 
-        const canvas = containerRef.current?.querySelector('canvas');
-        if (!canvas) return false;
+      const canvas = containerRef.current.querySelector('canvas');
+      const textarea = containerRef.current.querySelector('textarea') as HTMLElement | null;
 
-        const rect = canvas.getBoundingClientRect();
-        const charW = term.renderer?.charWidth ?? 8;
-        const charH = term.renderer?.charHeight ?? 16;
-        const x = Math.max(1, Math.floor((event.clientX - rect.left) / charW) + 1);
-        const y = Math.max(1, Math.floor((event.clientY - rect.top) / charH) + 1);
-        const button = event.deltaY > 0 ? 65 : 64; // wheel down : wheel up
+      if (canvas) {
+        function cellCoords(event: MouseEvent) {
+          const rect = canvas.getBoundingClientRect();
+          const charW = term.renderer?.charWidth ?? 8;
+          const charH = term.renderer?.charHeight ?? 16;
+          return {
+            x: Math.max(1, Math.floor((event.clientX - rect.left) / charW) + 1),
+            y: Math.max(1, Math.floor((event.clientY - rect.top) / charH) + 1),
+          };
+        }
 
-        const seq = `\x1b[<${button};${x};${y}M`;
-        sendEncryptedData(seq);
-        return true;
-      });
+        function sgrModifiers(event: MouseEvent): number {
+          let mod = 0;
+          if (event.shiftKey) mod |= 4;
+          if (event.metaKey) mod |= 8;
+          if (event.ctrlKey) mod |= 16;
+          return mod;
+        }
+
+        /** Send SGR press (M) or release (m) sequence. Returns false if event should not be handled. */
+        function sendSgrButton(event: MouseEvent, release: boolean): boolean {
+          if (!term.hasMouseTracking()) return false;
+          if (event.button === 2 || event.ctrlKey || event.metaKey) return false;
+          const { x, y } = cellCoords(event);
+          const btn = event.button + sgrModifiers(event);
+          sendEncryptedData(`\x1b[<${btn};${x};${y}${release ? 'm' : 'M'}`);
+          return true;
+        }
+
+        term.attachCustomWheelEventHandler((event: WheelEvent) => {
+          if (!term.hasMouseTracking()) return false;
+          const { x, y } = cellCoords(event);
+          const button = event.deltaY > 0 ? 65 : 64;
+          sendEncryptedData(`\x1b[<${button};${x};${y}M`);
+          return true;
+        });
+
+        function handleMouseDown(event: MouseEvent) {
+          if (!sendSgrButton(event, false)) return;
+          event.stopPropagation();
+          event.preventDefault();
+          textarea?.focus(); // stopPropagation blocks ghostty-web's focus handler
+        }
+
+        // Registered on document to catch releases outside the terminal canvas
+        function handleMouseUp(event: MouseEvent) {
+          sendSgrButton(event, true);
+        }
+
+        let moveThrottleTimer: ReturnType<typeof setTimeout> | undefined;
+        function handleMouseMove(event: MouseEvent) {
+          if (!term.hasMouseTracking() || moveThrottleTimer) return;
+          // Mode 1003 = any-event (all motion), 1002 = button-event (motion while held)
+          const anyEvent = term.getMode(1003);
+          const buttonEvent = term.getMode(1002);
+          if (!anyEvent && !buttonEvent) return;
+          if (buttonEvent && !anyEvent && event.buttons === 0) return;
+          const { x, y } = cellCoords(event);
+          // Held button offset: left=0, middle=1, right=2, none=3
+          const held = (event.buttons & 1) ? 0 : (event.buttons & 4) ? 1 : (event.buttons & 2) ? 2 : 3;
+          const btn = 32 + held + sgrModifiers(event);
+          sendEncryptedData(`\x1b[<${btn};${x};${y}M`);
+          moveThrottleTimer = setTimeout(() => { moveThrottleTimer = undefined; }, 16);
+        }
+
+        canvas.addEventListener('mousedown', handleMouseDown, { capture: true });
+        canvas.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        cleanups.push(() => {
+          canvas.removeEventListener('mousedown', handleMouseDown, { capture: true });
+          canvas.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+          clearTimeout(moveThrottleTimer);
+        });
+      }
+      // --- End SGR mouse protocol workaround ---
 
       const inputDisposable = term.onData((data: string) => {
         sendEncryptedData(data);
