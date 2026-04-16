@@ -108,13 +108,18 @@ Agent 是一个单文件 Go 二进制，运行在你的本地机器上。
 
 | 平台 | 文件名 |
 |------|--------|
-| macOS (Apple Silicon) | `rttys-agent-macOS-arm64` |
-| macOS (Intel) | `rttys-agent-macOS-x64` |
+| **macOS 菜单栏应用（推荐）** ⭐ | `RttysAgent.zip` |
+| macOS CLI (Apple Silicon) | `rttys-agent-macOS-arm64` |
+| macOS CLI (Intel) | `rttys-agent-macOS-x64` |
 | Linux (x86_64) | `rttys-agent-Linux-x64` |
 | Linux (ARM64) | `rttys-agent-Linux-arm64` |
 | Windows (x86_64) | `rttys-agent-Windows-x64.exe` |
 
-**macOS / Linux：**
+**macOS 菜单栏应用：** 解压后把 `RttysAgent.app` 拖进 `/Applications`。启动后顶部菜单栏会出现状态图标，提供连接状态显示、日志查看和内置配置编辑器 — 全程无需终端命令。通用二进制（arm64 + x86_64），Developer ID 签名并经 Apple 公证，内置 [Sparkle](https://sparkle-project.org/) 自动更新。使用菜单栏应用时，下方第 2、3 步可跳过，直接在菜单栏 UI 中完成配置。
+
+> **首次使用权限提示：** 当终端会话首次访问 `~/Documents`、`~/Desktop`、`~/Downloads` 或 iCloud Drive 等受保护目录时，macOS 会弹出类似 *"RttysAgent 想访问您"文稿"文件夹中的文件"* 的系统提示。点击 **允许** 即可 — 这是 macOS 的 TCC 隐私保护机制，并非应用本身的问题，每个目录只会询问一次。若想一次性授权所有路径，可在 **系统设置 → 隐私与安全性 → 完全磁盘访问权限** 中添加 RttysAgent。
+
+**macOS / Linux CLI：**
 
 ```bash
 chmod +x rttys-agent-*
@@ -274,7 +279,8 @@ cd agent && go vet ./...
 
 ```
 remotettys/
-├── agent/              # Go — 本地 Agent 二进制
+├── agent/              # Go — 本地 Agent 二进制（跨平台 CLI）
+├── agent-mac/          # Swift — macOS 菜单栏应用，封装 Go Agent
 ├── packages/
 │   ├── relay/          # TypeScript — WebSocket 中继 + REST API
 │   └── web/            # React + Vite — 浏览器终端 UI

@@ -108,13 +108,18 @@ Go to the [Releases](https://github.com/finchxu/RemoteTTYs/releases) page and do
 
 | Platform | File |
 |----------|------|
-| macOS (Apple Silicon) | `rttys-agent-macOS-arm64` |
-| macOS (Intel) | `rttys-agent-macOS-x64` |
+| **macOS menu bar app (recommended)** ⭐ | `RttysAgent.zip` |
+| macOS CLI (Apple Silicon) | `rttys-agent-macOS-arm64` |
+| macOS CLI (Intel) | `rttys-agent-macOS-x64` |
 | Linux (x86_64) | `rttys-agent-Linux-x64` |
 | Linux (ARM64) | `rttys-agent-Linux-arm64` |
 | Windows (x86_64) | `rttys-agent-Windows-x64.exe` |
 
-**macOS / Linux:**
+**macOS menu bar app:** unzip and drag `RttysAgent.app` to `/Applications`. Launching it adds a menu bar icon with live connection status, log viewer, and a built-in config editor — no terminal commands needed. Universal binary (arm64 + x86_64), Developer ID signed, notarized, and self-updates via [Sparkle](https://sparkle-project.org/). If you install the app, skip sections 2–3 below and configure via the menu bar UI instead.
+
+> **First-run permission prompts:** The first time a terminal session reaches into a protected folder (e.g. `~/Documents`, `~/Desktop`, `~/Downloads`, or iCloud Drive), macOS will show a system dialog like *"RttysAgent would like to access files in your Documents folder"*. Click **Allow** — this is macOS's standard TCC privacy mechanism, not an issue with the app, and each folder only asks once. To grant access to everything up front, add RttysAgent under **System Settings → Privacy & Security → Full Disk Access**.
+
+**macOS / Linux CLI:**
 
 ```bash
 chmod +x rttys-agent-*
@@ -274,7 +279,8 @@ cd agent && go vet ./...
 
 ```
 remotettys/
-├── agent/              # Go — local agent binary
+├── agent/              # Go — local agent binary (cross-platform CLI)
+├── agent-mac/          # Swift — macOS menu bar app wrapping the Go agent
 ├── packages/
 │   ├── relay/          # TypeScript — WebSocket relay + REST API
 │   └── web/            # React + Vite — browser terminal UI
