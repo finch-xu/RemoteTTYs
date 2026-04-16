@@ -180,6 +180,8 @@ docs/
 agent-mac/RttysAgent/Resources/rttys-agent
 agent-mac/build/
 agent-mac/DerivedData/
+agent-mac/**/*.xcodeproj/xcuserdata/
+agent-mac/**/*.xcodeproj/project.xcworkspace/xcuserdata/
 
 CLAUDE.md
 .DS_Store
