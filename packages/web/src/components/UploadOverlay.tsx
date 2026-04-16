@@ -5,12 +5,11 @@ import type { UploadState } from './TerminalView';
 interface UploadOverlayProps {
   uploadState: UploadState | null;
   isDragging: boolean;
-  showNoClipboardToast: boolean;
   onSendToTerminal: () => void;
   onDismiss: () => void;
 }
 
-export function UploadOverlay({ uploadState, isDragging, showNoClipboardToast, onSendToTerminal, onDismiss }: UploadOverlayProps) {
+export function UploadOverlay({ uploadState, isDragging, onSendToTerminal, onDismiss }: UploadOverlayProps) {
   const { ui } = useTheme();
 
   return (
@@ -26,18 +25,6 @@ export function UploadOverlay({ uploadState, isDragging, showNoClipboardToast, o
           <span style={{ fontSize: 15, color: ui.accent, fontFamily: UI_FONT, fontWeight: 500 }}>
             Drop image to upload
           </span>
-        </div>
-      )}
-
-      {/* No clipboard toast */}
-      {showNoClipboardToast && (
-        <div style={{
-          position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 30,
-          background: ui.surface, border: `1px solid ${ui.border}`, borderRadius: 8,
-          padding: '8px 16px', fontSize: 13, color: ui.textSecondary, fontFamily: UI_FONT,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-        }}>
-          This Agent does not support image paste (no system clipboard)
         </div>
       )}
 
@@ -69,27 +56,33 @@ export function UploadOverlay({ uploadState, isDragging, showNoClipboardToast, o
           )}
 
           {uploadState.status === 'waiting' && (
-            <span style={{ color: ui.textSecondary }}>Writing to clipboard...</span>
+            <span style={{ color: ui.textSecondary }}>Saving image...</span>
           )}
 
           {uploadState.status === 'complete' && (
             <>
-              <span style={{ color: ui.online }}>Image ready</span>
+              <span style={{ color: ui.online, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {uploadState.filePath ? `Saved: ${uploadState.filePath}` : 'Image ready'}
+              </span>
               <div style={{ flex: 1 }} />
-              <button
-                onClick={onSendToTerminal}
-                style={{
-                  background: ui.accent, color: ui.accentText, border: 'none', borderRadius: 6,
-                  padding: '5px 14px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
-                }}
-              >
-                Send to terminal
-              </button>
+              {uploadState.filePath && (
+                <button
+                  onClick={onSendToTerminal}
+                  style={{
+                    background: ui.accent, color: ui.accentText, border: 'none', borderRadius: 6,
+                    padding: '5px 14px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
+                    flexShrink: 0,
+                  }}
+                >
+                  Paste file path
+                </button>
+              )}
               <button
                 onClick={onDismiss}
                 style={{
                   background: 'none', border: `1px solid ${ui.border}`, borderRadius: 6,
                   padding: '5px 10px', fontSize: 12, cursor: 'pointer', color: ui.textSecondary, fontFamily: 'inherit',
+                  flexShrink: 0,
                 }}
               >
                 Close

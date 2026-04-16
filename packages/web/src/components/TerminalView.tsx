@@ -17,7 +17,7 @@ import {
   DIRECTION_A2B,
 } from '../lib/e2e';
 import type { E2ESession, E2EKeyPairData } from '../lib/e2e';
-import type { PtyData, PtyExited, PtyReplay, PtyError, FileTransferComplete } from '../lib/protocol';
+import type { PtyData, PtyExited, PtyReplay, PtyError, FileTransferAck, FileTransferProgress, FileTransferComplete } from '../lib/protocol';
 
 const CHUNK_SIZE = 32 * 1024; // 32KB per chunk
 
@@ -29,6 +29,7 @@ export interface UploadState {
   chunksSent: number;
   status: 'sending' | 'waiting' | 'complete' | 'error';
   error?: string;
+  filePath?: string;
 }
 
 interface TerminalViewProps {
@@ -51,11 +52,13 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
   const e2eRef = useRef<E2ESession | null>(null);
   const { terminalTheme, fontSize, fontFamily, pasteImageTypes, pasteImageMaxSizeMB } = useTheme();
   const [uploadState, setUploadState] = useState<UploadState | null>(null);
-  const [showNoClipboardToast, setShowNoClipboardToast] = useState(false);
+  const uploadStateRef = useRef<UploadState | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const { progress, feed: feedProgress } = useProgressBar();
   const sendEncryptedDataRef = useRef<((data: string) => void) | null>(null);
-  const clipboardToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep ref in sync for access inside capture-phase paste handler closure
+  useEffect(() => { uploadStateRef.current = uploadState; }, [uploadState]);
 
   // Update theme/font on existing terminal when settings change
   useEffect(() => {
@@ -132,6 +135,22 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
       }
       async function sendEncryptedData(data: string) {
         queueEncryptedSend(textEncoder.encode(data), { type: 'pty.data', agentId, sessionId });
+      }
+
+      // Promise queue to serialize decryptions (prevents recvCounter race when messages arrive rapidly)
+      const textDecoder = new TextDecoder();
+      let recvQueue = Promise.resolve();
+      function queueDecrypt(payload: string): Promise<Uint8Array> {
+        return new Promise((resolve, reject) => {
+          recvQueue = recvQueue.then(async () => {
+            try { resolve(await decryptPayload(payload)); }
+            catch (e) { reject(e); }
+          });
+        });
+      }
+      async function decryptJSON(payload: string): Promise<unknown> {
+        const bytes = await queueDecrypt(payload);
+        return JSON.parse(textDecoder.decode(bytes));
       }
 
       /** Send pty.resize with HMAC if E2E is active. */
@@ -358,10 +377,9 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
           if (items[i].type.startsWith('image/')) {
             event.preventDefault();
             event.stopPropagation();
-            if (!clipboardAvailable) {
-              if (clipboardToastTimerRef.current) clearTimeout(clipboardToastTimerRef.current);
-              setShowNoClipboardToast(true);
-              clipboardToastTimerRef.current = setTimeout(() => setShowNoClipboardToast(false), 3000);
+            // Don't re-trigger if upload is in progress or just completed
+            const current = uploadStateRef.current;
+            if (current && (current.status === 'sending' || current.status === 'waiting' || current.status === 'complete')) {
               return;
             }
             const file = items[i].getAsFile();
@@ -387,7 +405,7 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
       function handleDrop(event: DragEvent) {
         event.preventDefault();
         setIsDragging(false);
-        if (!clipboardAvailable || !event.dataTransfer?.files.length) return;
+        if (!event.dataTransfer?.files.length) return;
         const file = event.dataTransfer.files[0];
         if (file.type.startsWith('image/')) {
           startImageTransfer(file);
@@ -408,7 +426,7 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
       cleanups.push(subscribe('pty.data', async (msg: PtyData) => {
         if (msg.sessionId !== sessionId) return;
         try {
-          const bytes = await decryptPayload(msg.payload);
+          const bytes = await queueDecrypt(msg.payload);
           feedProgress(bytes);
           term.write(bytes);
         } catch (err) {
@@ -425,7 +443,7 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
       cleanups.push(subscribe('pty.replay', async (msg: PtyReplay) => {
         if (msg.sessionId !== sessionId) return;
         try {
-          const bytes = await decryptPayload(msg.payload);
+          const bytes = await queueDecrypt(msg.payload);
           term.write(bytes);
         } catch (err) {
           console.error('[E2E] Failed to decrypt pty.replay:', err);
@@ -439,11 +457,42 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
         }
       }));
 
-      cleanups.push(subscribe('file.transfer.complete', (msg: FileTransferComplete) => {
+      cleanups.push(subscribe('file.transfer.ack', async (msg: FileTransferAck) => {
         if (msg.sessionId !== sessionId) return;
+        try {
+          const decoded = await decryptJSON(msg.payload) as { accepted: boolean; error?: string };
+          if (!decoded.accepted) {
+            setUploadState(prev => {
+              if (!prev || prev.transferId !== msg.transferId) return prev;
+              return { ...prev, status: 'error', error: decoded.error || 'Transfer rejected' };
+            });
+          }
+        } catch (err) {
+          console.error('[E2E] Failed to decrypt file.transfer.ack:', err);
+        }
+      }));
+
+      cleanups.push(subscribe('file.transfer.progress', async (msg: FileTransferProgress) => {
+        if (msg.sessionId !== sessionId) return;
+        try {
+          await queueDecrypt(msg.payload);
+        } catch (err) {
+          console.error('[E2E] Failed to decrypt file.transfer.progress:', err);
+        }
+      }));
+
+      cleanups.push(subscribe('file.transfer.complete', async (msg: FileTransferComplete) => {
+        if (msg.sessionId !== sessionId) return;
+        let filePath: string | undefined;
+        try {
+          const decoded = await decryptJSON(msg.payload) as { filePath?: string };
+          filePath = decoded.filePath;
+        } catch (err) {
+          console.error('[E2E] Failed to decrypt file.transfer.complete:', err);
+        }
         setUploadState(prev => {
           if (!prev || prev.transferId !== msg.transferId) return prev;
-          return { ...prev, status: 'complete' };
+          return { ...prev, status: 'complete', filePath };
         });
       }));
 
@@ -475,15 +524,16 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
     return () => {
       disposed = true;
       e2eRef.current = null;
-      if (clipboardToastTimerRef.current) clearTimeout(clipboardToastTimerRef.current);
       for (const fn of cleanups) fn();
     };
   }, [agentId, sessionId, agentPublicKey, agentSignature, send, subscribe]);
 
   const handleSendToTerminal = useCallback(() => {
-    sendEncryptedDataRef.current?.('\x16');
+    if (uploadState?.filePath && sendEncryptedDataRef.current) {
+      sendEncryptedDataRef.current(uploadState.filePath);
+    }
     setUploadState(null);
-  }, []);
+  }, [uploadState?.filePath]);
 
   const handleDismissUpload = useCallback(() => {
     setUploadState(null);
@@ -496,7 +546,6 @@ export function TerminalView({ agentId, sessionId, isExisting, identityKey, ecdh
       <UploadOverlay
         uploadState={uploadState}
         isDragging={isDragging}
-        showNoClipboardToast={showNoClipboardToast}
         onSendToTerminal={handleSendToTerminal}
         onDismiss={handleDismissUpload}
       />

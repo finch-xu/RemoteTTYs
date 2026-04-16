@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"log"
+	"os"
 	"time"
 )
 
@@ -52,6 +53,7 @@ type progressPayload struct {
 type completePayload struct {
 	Mode        string `json:"mode"`
 	SHA256Match bool   `json:"sha256Match"`
+	FilePath    string `json:"filePath,omitempty"`
 }
 
 // decryptIncoming decodes base64, decrypts with B2A key, and increments RecvCounter.
@@ -102,10 +104,6 @@ func (c *Client) handleFileTransferStart(msg IncomingMessage) {
 		return
 	}
 
-	if !c.hasClipboard {
-		c.sendAck(sess, msg.TransferID, false, "clipboard not available on this agent")
-		return
-	}
 	if meta.TotalSize > maxTransferSize {
 		c.sendAck(sess, msg.TransferID, false, "file too large")
 		return
@@ -218,13 +216,23 @@ func (c *Client) handleFileTransferEnd(msg IncomingMessage) {
 			msg.SessionID, msg.TransferID, endData.SHA256, actualSHA)
 	}
 
-	if err := WriteImageToClipboard(assembled, pt.MimeType); err != nil {
-		log.Printf("session %s: clipboard write error: %v", msg.SessionID, err)
-		c.sendAck(sess, msg.TransferID, false, "clipboard write failed: "+err.Error())
+	tmpFile, err := os.CreateTemp("", "rttys-paste-*"+extForMIME(pt.MimeType))
+	if err != nil {
+		log.Printf("session %s: temp file creation error: %v", msg.SessionID, err)
+		c.sendAck(sess, msg.TransferID, false, "failed to save file: "+err.Error())
 		return
 	}
+	if _, err := tmpFile.Write(assembled); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		log.Printf("session %s: temp file write error: %v", msg.SessionID, err)
+		c.sendAck(sess, msg.TransferID, false, "failed to save file: "+err.Error())
+		return
+	}
+	tmpFile.Close()
+	filePath := tmpFile.Name()
 
-	data, _ := json.Marshal(completePayload{Mode: "clipboard", SHA256Match: sha256Match})
+	data, _ := json.Marshal(completePayload{Mode: "file", SHA256Match: sha256Match, FilePath: filePath})
 	c.Send(FileTransferCompleteMsg{
 		Type:       "file.transfer.complete",
 		SessionID:  msg.SessionID,
@@ -232,6 +240,6 @@ func (c *Client) handleFileTransferEnd(msg IncomingMessage) {
 		Payload:    encryptOutgoing(sess, data),
 	})
 
-	log.Printf("session %s: transfer %s complete, written to clipboard (%d bytes, sha256_ok=%v)",
-		msg.SessionID, msg.TransferID, len(assembled), sha256Match)
+	log.Printf("session %s: transfer %s complete, saved to %s (%d bytes, sha256_ok=%v)",
+		msg.SessionID, msg.TransferID, filePath, len(assembled), sha256Match)
 }
