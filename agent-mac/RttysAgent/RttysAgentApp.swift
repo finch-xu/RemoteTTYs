@@ -38,6 +38,11 @@ struct RttysAgentApp: App {
             LogView(logStore: logStore)
         }
         .defaultSize(width: 600, height: 400)
+
+        Window("About RttysAgent", id: "about") {
+            AboutView(updater: updaterController.updater)
+        }
+        .windowResizability(.contentSize)
     }
 
     private var menuBarLabel: some View {

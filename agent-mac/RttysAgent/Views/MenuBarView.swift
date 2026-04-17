@@ -43,6 +43,13 @@ struct MenuBarView: View {
         }
         .disabled(!updater.canCheckForUpdates)
 
+        Button {
+            openWindow(id: "about")
+            NSApp.activate(ignoringOtherApps: true)
+        } label: {
+            Label("About RttysAgent", systemImage: "info.circle")
+        }
+
         Divider()
 
         // Login item toggle
