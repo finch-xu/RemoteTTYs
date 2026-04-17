@@ -18,7 +18,8 @@ type PTYHandle struct {
 
 // startPTY spawns a shell in a new PTY and returns a handle.
 func startPTY(shell string, dir string, env []string) (*PTYHandle, error) {
-	cmd := exec.Command(shell)
+	// -l: login shell, so .zprofile/.bash_profile load (Homebrew PATH lives there).
+	cmd := exec.Command(shell, "-l")
 	cmd.Dir = dir
 	cmd.Env = env
 
