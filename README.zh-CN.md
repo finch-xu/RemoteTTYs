@@ -109,7 +109,10 @@ Agent 是一个单文件 Go 二进制，运行在你的本地机器上。
 
 <table>
   <tr>
-    <td rowspan="7" align="center"><img src="images/rttys-agent-logo-rounded.png" width="160" /></td>
+    <td rowspan="7" align="center">
+      <img src="images/rttys-agent-logo-rounded.png" width="160" /><br/>
+      <b>RttysAgent</b>
+    </td>
     <th>平台</th>
     <th>文件名</th>
   </tr>

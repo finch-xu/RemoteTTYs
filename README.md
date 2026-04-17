@@ -109,7 +109,10 @@ Go to the [Releases](https://github.com/finch-xu/RemoteTTYs/releases) page and d
 
 <table>
   <tr>
-    <td rowspan="7" align="center"><img src="images/rttys-agent-logo-rounded.png" width="160" /></td>
+    <td rowspan="7" align="center">
+      <img src="images/rttys-agent-logo-rounded.png" width="160" /><br/>
+      <b>RttysAgent</b>
+    </td>
     <th>Platform</th>
     <th>File</th>
   </tr>
