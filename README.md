@@ -6,6 +6,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](agent/go.mod)
+[![Swift](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)](agent-mac/)
 [![Node.js](https://img.shields.io/badge/Node.js-24+-339933?logo=node.js&logoColor=white)](packages/relay/package.json)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](packages/web/package.json)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
@@ -106,14 +107,37 @@ The agent is a single Go binary that runs on your local machines.
 
 Go to the [Releases](https://github.com/finch-xu/RemoteTTYs/releases) page and download the binary for your platform:
 
-| Platform | File |
-|----------|------|
-| **macOS menu bar app (recommended)** ⭐ | `RttysAgent.zip` |
-| macOS CLI (Apple Silicon) | `rttys-agent-macOS-arm64` |
-| macOS CLI (Intel) | `rttys-agent-macOS-x64` |
-| Linux (x86_64) | `rttys-agent-Linux-x64` |
-| Linux (ARM64) | `rttys-agent-Linux-arm64` |
-| Windows (x86_64) | `rttys-agent-Windows-x64.exe` |
+<table>
+  <tr>
+    <td rowspan="7" align="center"><img src="images/rttys-agent-logo-rounded.png" width="160" /></td>
+    <th>Platform</th>
+    <th>File</th>
+  </tr>
+  <tr>
+    <td><b>macOS menu bar app (recommended)</b> ⭐</td>
+    <td><code>RttysAgent.zip</code></td>
+  </tr>
+  <tr>
+    <td>macOS CLI (Apple Silicon)</td>
+    <td><code>rttys-agent-macOS-arm64</code></td>
+  </tr>
+  <tr>
+    <td>macOS CLI (Intel)</td>
+    <td><code>rttys-agent-macOS-x64</code></td>
+  </tr>
+  <tr>
+    <td>Linux (x86_64)</td>
+    <td><code>rttys-agent-Linux-x64</code></td>
+  </tr>
+  <tr>
+    <td>Linux (ARM64)</td>
+    <td><code>rttys-agent-Linux-arm64</code></td>
+  </tr>
+  <tr>
+    <td>Windows (x86_64)</td>
+    <td><code>rttys-agent-Windows-x64.exe</code></td>
+  </tr>
+</table>
 
 **macOS menu bar app:** unzip and drag `RttysAgent.app` to `/Applications`. Launching it adds a menu bar icon with live connection status, log viewer, and a built-in config editor — no terminal commands needed. Universal binary (arm64 + x86_64), Developer ID signed, notarized, and self-updates via [Sparkle](https://sparkle-project.org/). If you install the app, skip sections 2–3 below and configure via the menu bar UI instead.
 

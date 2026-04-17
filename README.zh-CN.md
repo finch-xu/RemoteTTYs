@@ -6,6 +6,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](agent/go.mod)
+[![Swift](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)](agent-mac/)
 [![Node.js](https://img.shields.io/badge/Node.js-24+-339933?logo=node.js&logoColor=white)](packages/relay/package.json)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](packages/web/package.json)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
@@ -106,14 +107,37 @@ Agent 是一个单文件 Go 二进制，运行在你的本地机器上。
 
 前往 [Releases](https://github.com/finch-xu/RemoteTTYs/releases) 页面，下载对应平台的二进制文件：
 
-| 平台 | 文件名 |
-|------|--------|
-| **macOS 菜单栏应用（推荐）** ⭐ | `RttysAgent.zip` |
-| macOS CLI (Apple Silicon) | `rttys-agent-macOS-arm64` |
-| macOS CLI (Intel) | `rttys-agent-macOS-x64` |
-| Linux (x86_64) | `rttys-agent-Linux-x64` |
-| Linux (ARM64) | `rttys-agent-Linux-arm64` |
-| Windows (x86_64) | `rttys-agent-Windows-x64.exe` |
+<table>
+  <tr>
+    <td rowspan="7" align="center"><img src="images/rttys-agent-logo-rounded.png" width="160" /></td>
+    <th>平台</th>
+    <th>文件名</th>
+  </tr>
+  <tr>
+    <td><b>macOS 菜单栏应用（推荐）</b> ⭐</td>
+    <td><code>RttysAgent.zip</code></td>
+  </tr>
+  <tr>
+    <td>macOS CLI (Apple Silicon)</td>
+    <td><code>rttys-agent-macOS-arm64</code></td>
+  </tr>
+  <tr>
+    <td>macOS CLI (Intel)</td>
+    <td><code>rttys-agent-macOS-x64</code></td>
+  </tr>
+  <tr>
+    <td>Linux (x86_64)</td>
+    <td><code>rttys-agent-Linux-x64</code></td>
+  </tr>
+  <tr>
+    <td>Linux (ARM64)</td>
+    <td><code>rttys-agent-Linux-arm64</code></td>
+  </tr>
+  <tr>
+    <td>Windows (x86_64)</td>
+    <td><code>rttys-agent-Windows-x64.exe</code></td>
+  </tr>
+</table>
 
 **macOS 菜单栏应用：** 解压后把 `RttysAgent.app` 拖进 `/Applications`。启动后顶部菜单栏会出现状态图标，提供连接状态显示、日志查看和内置配置编辑器 — 全程无需终端命令。通用二进制（arm64 + x86_64），Developer ID 签名并经 Apple 公证，内置 [Sparkle](https://sparkle-project.org/) 自动更新。使用菜单栏应用时，下方第 2、3 步可跳过，直接在菜单栏 UI 中完成配置。
 
