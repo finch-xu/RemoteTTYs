@@ -114,25 +114,24 @@ struct MenuBarView: View {
 
     @ViewBuilder
     private var controlSection: some View {
-        if agentProcess.isRunning {
-            Button {
-                agentProcess.stop()
-                statusMonitor.reset()
-            } label: {
-                Label("Stop Agent", systemImage: "stop.fill")
+        Button {
+            if configManager.isValid {
+                agentProcess.start()
+                statusMonitor.startPolling()
+            } else {
+                openWindow(id: "config")
+                NSApp.activate(ignoringOtherApps: true)
             }
-        } else {
-            Button {
-                if configManager.isValid {
-                    agentProcess.start()
-                    statusMonitor.startPolling()
-                } else {
-                    openWindow(id: "config")
-                    NSApp.activate(ignoringOtherApps: true)
-                }
-            } label: {
-                Label("Start Agent", systemImage: "play.fill")
-            }
+        } label: {
+            Label("Start Agent", systemImage: "play.fill")
+        }
+        .disabled(agentProcess.isActive)
+
+        Button {
+            agentProcess.stop()
+            statusMonitor.reset()
+        } label: {
+            Label("Stop Agent", systemImage: "stop.fill")
         }
     }
 }

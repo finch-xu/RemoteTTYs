@@ -17,6 +17,13 @@ final class AgentProcess {
         return false
     }
 
+    var isActive: Bool {
+        switch state {
+        case .stopped: return false
+        case .starting, .running, .restarting: return true
+        }
+    }
+
     private var process: Process?
     private var stdoutPipe: Pipe?
     private var stderrPipe: Pipe?
@@ -32,7 +39,7 @@ final class AgentProcess {
     }
 
     func start() {
-        guard !isRunning else { return }
+        guard !isActive else { return }
 
         shouldRestart = true
         restartDelay = 1.0
@@ -44,8 +51,12 @@ final class AgentProcess {
         shouldRestart = false
         restartTask?.cancel()
         restartTask = nil
+        let hadTrackedProcess = process != nil
         terminateProcess()
         state = .stopped
+        if !hadTrackedProcess {
+            Task { await self.runCLIStop() }
+        }
     }
 
     // MARK: - Private
@@ -66,22 +77,25 @@ final class AgentProcess {
         }
     }
 
+    private func makeAgentProcess(args: [String]) -> Process? {
+        guard let agentPath = Bundle.main.path(forResource: "rttys-agent", ofType: nil) else { return nil }
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: agentPath)
+        proc.arguments = args
+        var env = ProcessInfo.processInfo.environment
+        env["HOME"] = FileManager.default.homeDirectoryForCurrentUser.path
+        proc.environment = env
+        return proc
+    }
+
     private func launchProcess() {
-        guard let agentPath = Bundle.main.path(forResource: "rttys-agent", ofType: nil) else {
+        guard let proc = makeAgentProcess(args: []) else {
             logStore?.append("[RttysAgent] ERROR: rttys-agent binary not found in app bundle")
             state = .stopped
             return
         }
 
         state = .starting
-
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: agentPath)
-        proc.arguments = []
-
-        var env = ProcessInfo.processInfo.environment
-        env["HOME"] = FileManager.default.homeDirectoryForCurrentUser.path
-        proc.environment = env
 
         let stdout = Pipe()
         let stderr = Pipe()
@@ -151,6 +165,38 @@ final class AgentProcess {
             try? await Task.sleep(for: .seconds(3))
             if proc.isRunning {
                 proc.interrupt()
+            }
+        }
+    }
+
+    private func runCLIStop() async {
+        guard let proc = makeAgentProcess(args: ["stop"]) else { return }
+        let out = Pipe()
+        proc.standardOutput = out
+        proc.standardError = out
+
+        do {
+            try proc.run()
+        } catch {
+            logStore?.append("[RttysAgent] CLI stop failed to launch: \(error.localizedDescription)")
+            return
+        }
+
+        let timeout = Task { [weak proc] in
+            try? await Task.sleep(for: .seconds(2))
+            if let p = proc, p.isRunning { p.terminate() }
+        }
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            proc.terminationHandler = { _ in cont.resume() }
+        }
+        timeout.cancel()
+
+        if let data = try? out.fileHandleForReading.readToEnd(),
+           let text = String(data: data, encoding: .utf8) {
+            for line in text.components(separatedBy: .newlines)
+                .map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+                .filter({ !$0.isEmpty }) {
+                logStore?.append("[cli] \(line)")
             }
         }
     }
