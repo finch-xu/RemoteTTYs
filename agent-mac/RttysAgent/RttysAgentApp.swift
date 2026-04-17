@@ -46,8 +46,9 @@ struct RttysAgentApp: App {
     }
 
     private var menuBarLabel: some View {
-        Image(systemName: agentProcess.isRunning ? "terminal.fill" : "terminal")
-            .symbolRenderingMode(.hierarchical)
+        Image("MenuBarIcon")
+            .resizable()
+            .frame(width: 14, height: 14)
     }
 
     init() {
