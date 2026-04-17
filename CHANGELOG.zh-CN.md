@@ -11,6 +11,14 @@ RemoteTTYs 的所有重要变更都会记录在本文件中。
 
 ## [Unreleased]
 
+### 变更
+- **macOS 应用：Stop 菜单项现在始终显示且始终可点。** 此前 Stop 仅在应用认为 agent 正在运行时才显示——也就是说在 `.starting` 和 `.restarting` 过渡态下 Stop 消失，用户无法中断无限重启循环。Start 现在在所有活跃态（`.starting`、`.running`、`.restarting`）下都置灰，而不再仅限 `.running`。
+- **macOS 应用：菜单栏图标与 About 窗口 logo** 改用项目自带的 rttys-agent 美术资源（`MenuBarIcon`、`AppLogo` 资源集），不再使用系统符号和通用应用图标。
+
+### 修复
+- **macOS 应用：异常退出后残留的孤儿 agent 守护进程。** 当 Swift 应用崩溃或被强制结束时，内嵌的 Go `rttys-agent` 子进程会被 launchd 收养并继续运行。下次打开应用时用户除了手动 kill 别无他法。现在点击 Stop 会调用内嵌的 `rttys-agent stop` CLI 通过 `~/.rttys/agent.pid` 回收孤儿进程。该调用仅在应用没有追踪任何子进程时触发，因此日常点击 Stop 零额外开销。
+- **macOS 应用：Quit/Stop 时菜单冻结最长 2 秒。** 此前孤儿清理子进程使用 `Process.waitUntilExit()` 在 `@MainActor` 上同步等待，阻塞菜单动画以及 `NSApp.terminate(nil)` 的响应。现已改用 `terminationHandler` + `withCheckedContinuation`，CLI 执行期间主 actor 保持响应。
+
 ### 文档
 - README：将 `RttysAgent.zip` 列为 macOS 推荐方案；补充首次使用时 macOS TCC 权限弹窗（`~/Documents`、`~/Desktop`、`~/Downloads`、iCloud Drive）的说明，并指出 **完全磁盘访问权限** 可作为一次性授权的替代方案；将 `agent-mac/` 加入项目结构说明。
 

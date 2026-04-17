@@ -11,6 +11,14 @@ Release history prior to `v0.5.0` is available via [Git tags](https://github.com
 
 ## [Unreleased]
 
+### Changed
+- **macOS app: Stop menu item is now always visible and always enabled.** Previously the Stop item was hidden whenever the app believed no agent was running — which also hid it during `.starting` and `.restarting` transitions, leaving users unable to interrupt a restart loop. Start is now disabled during every active state (`.starting`, `.running`, `.restarting`) instead of only `.running`.
+- **macOS app: menu bar glyph and About window logo** now use the bundled rttys-agent artwork (`MenuBarIcon`, `AppLogo` asset sets) instead of system symbols and the generic application icon.
+
+### Fixed
+- **macOS app: orphan agent daemon left behind after an abnormal app exit.** When the Swift app crashes or is force-killed, the embedded Go `rttys-agent` child is reparented to launchd and keeps running. On next launch the user had no way to clean it up short of killing it by hand. Clicking Stop now shells out to the bundled `rttys-agent stop` CLI, which reaps any orphan via `~/.rttys/agent.pid`. The CLI call is gated to run only when the app has no tracked child process, so normal Stop clicks pay zero extra cost.
+- **macOS app: menu UI freeze up to 2 seconds on Quit/Stop.** The orphan-cleanup subprocess was previously awaited with a synchronous `Process.waitUntilExit()` on the `@MainActor`, stalling menu animations and the app's response to `NSApp.terminate(nil)`. It now uses `terminationHandler` + `withCheckedContinuation` so the main actor stays responsive while the CLI runs.
+
 ### Documentation
 - README: list `RttysAgent.zip` as the recommended macOS agent, document the first-run macOS TCC prompts (`~/Documents`, `~/Desktop`, `~/Downloads`, iCloud Drive) and point to **Full Disk Access** as a one-shot alternative, and add `agent-mac/` to the project structure.
 
