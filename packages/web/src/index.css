@@ -5,6 +5,116 @@
   font-display: swap;
 }
 
+/* Design tokens — light (default). Ported from design handoff `index.html`.
+   `--rttys-*` is the existing app convention; design-native aliases (`--bg`,
+   `--surface`, ...) point at the same values so future design ports can use
+   either name interchangeably. The JS theme in hooks/useTheme.ts keeps writing
+   a subset of `--rttys-*` via style.setProperty — those inline writes win by
+   specificity, so the accent switch still flows through at runtime. */
+:root {
+  --rttys-bg: #FAF7F2;
+  --rttys-surface: #FFFFFF;
+  --rttys-surface-alt: #F3EDE5;
+  --rttys-surface-active: #EDE5DA;
+  --rttys-border: #E8E0D8;
+  --rttys-border-strong: #D8CFC5;
+  --rttys-text-primary: #2D2B28;
+  --rttys-text-secondary: #7A736D;
+  --rttys-text-muted: #B5AFA8;
+  --rttys-accent: #C4704B;
+  --rttys-accent-hover: #B5613E;
+  --rttys-accent-soft: rgba(196, 112, 75, 0.12);
+  --rttys-online: #5BA37C;
+  --rttys-online-soft: rgba(91, 163, 124, 0.15);
+  --rttys-error: #D64545;
+  --rttys-warning: #D4930D;
+
+  --bg: var(--rttys-bg);
+  --surface: var(--rttys-surface);
+  --surface-alt: var(--rttys-surface-alt);
+  --surface-active: var(--rttys-surface-active);
+  --border: var(--rttys-border);
+  --border-strong: var(--rttys-border-strong);
+  --text-primary: var(--rttys-text-primary);
+  --text-secondary: var(--rttys-text-secondary);
+  --text-muted: var(--rttys-text-muted);
+  --accent: var(--rttys-accent);
+  --accent-hover: var(--rttys-accent-hover);
+  --accent-soft: var(--rttys-accent-soft);
+  --online: var(--rttys-online);
+  --online-soft: var(--rttys-online-soft);
+  --error: var(--rttys-error);
+  --warning: var(--rttys-warning);
+
+  --term-bg: #1C1917;
+  --term-fg: #E7E5E4;
+  --term-dim: #A8A29E;
+  --term-selection: #44403C;
+  --term-green: #7BB88E;
+  --term-red: #DC6B6B;
+  --term-yellow: #D4A843;
+  --term-blue: #6B9FDC;
+  --term-magenta: #B57BBC;
+  --term-cyan: #5BBEB5;
+
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --row-height: 36px;
+
+  --shadow-sm: 0 1px 2px rgba(45, 43, 40, 0.04);
+  --shadow-md: 0 2px 8px rgba(45, 43, 40, 0.06), 0 1px 3px rgba(45, 43, 40, 0.04);
+  --shadow-lg: 0 12px 32px rgba(45, 43, 40, 0.12), 0 4px 12px rgba(45, 43, 40, 0.06);
+}
+
+/* Design tokens — dark (warm). useTheme.ts sets <html data-theme="dark"> when
+   the resolved mode is dark; swapping palette values is all this block does. */
+[data-theme="dark"] {
+  --rttys-bg: #1A1714;
+  --rttys-surface: #24201C;
+  --rttys-surface-alt: #2D2822;
+  --rttys-surface-active: #38322B;
+  --rttys-border: #3A332D;
+  --rttys-border-strong: #4A4139;
+  --rttys-text-primary: #EDE7DF;
+  --rttys-text-secondary: #9C948B;
+  --rttys-text-muted: #6B635C;
+  --rttys-accent: #D4845A;
+  --rttys-accent-hover: #E0956B;
+  --rttys-accent-soft: rgba(212, 132, 90, 0.15);
+  --rttys-online: #6BC992;
+  --rttys-online-soft: rgba(107, 201, 146, 0.15);
+  --rttys-error: #EF6B6B;
+  --rttys-warning: #E8B04A;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Alt accents — exposed for future Tweaks / settings wiring. */
+[data-accent="sage"] {
+  --rttys-accent: #6B8E6F;
+  --rttys-accent-hover: #5A7D5E;
+  --rttys-accent-soft: rgba(107, 142, 111, 0.12);
+}
+[data-accent="cobalt"] {
+  --rttys-accent: #4A6FA5;
+  --rttys-accent-hover: #3D5E8C;
+  --rttys-accent-soft: rgba(74, 111, 165, 0.12);
+}
+[data-accent="mono"] {
+  --rttys-accent: #2D2B28;
+  --rttys-accent-hover: #1A1714;
+  --rttys-accent-soft: rgba(45, 43, 40, 0.08);
+}
+[data-theme="dark"][data-accent="mono"] {
+  --rttys-accent: #EDE7DF;
+  --rttys-accent-hover: #FFFFFF;
+  --rttys-accent-soft: rgba(237, 231, 223, 0.1);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -14,13 +124,44 @@
 body {
   margin: 0;
   overflow: hidden;
-  background: #FAF7F2;
+  font-family: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'ss01';
+  background: var(--rttys-bg);
+  color: var(--rttys-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.2s;
 }
 
 #root {
   width: 100vw;
   height: 100vh;
+}
+
+.mono {
+  font-family: 'JetBrains Mono Variable', Menlo, Monaco, 'Courier New', monospace;
+  font-feature-settings: 'calt' 1, 'liga' 1;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Scrollbar — warm tokens so it blends with surfaces in both themes. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--rttys-border);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--rttys-border-strong);
+  background-clip: padding-box;
+  border: 2px solid transparent;
 }
 
 /* Focus-visible: accessible focus indicators using theme accent color */
@@ -92,6 +233,45 @@ button:active:not(:disabled) {
 
 .progress-bar-indeterminate {
   animation: progressIndeterminate 1.5s ease-in-out infinite;
+}
+
+/* Design-handoff animations */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.cursor {
+  display: inline-block;
+  width: 0.6ch;
+  height: 1.1em;
+  background: var(--rttys-accent);
+  vertical-align: text-bottom;
+  animation: blink 1.1s steps(1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* Sparkline stroke draw-in (used by dashboard mini-charts) */
+@keyframes drawIn {
+  from { stroke-dashoffset: 300; }
+  to { stroke-dashoffset: 0; }
 }
 
 /* Prevent double-tap zoom on interactive elements (mobile) */

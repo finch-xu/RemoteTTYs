@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@fontsource-variable/cascadia-mono": "^5.2.2",
+    "@fontsource-variable/inter": "^5.2.8",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@fontsource-variable/noto-sans-mono": "^5.2.10",
     "ghostty-web": "^0.4.0",
