@@ -70,14 +70,26 @@ export function useAgentStore(
   // Re-fetch on WebSocket agent status changes and capture identityKey
   useEffect(() => {
     const unsubOnline = subscribe('agent.online', (msg: AgentOnline) => {
-      setAgents(prev => prev.map(a =>
-        a.id === msg.agentId ? {
-          ...a,
-          ...(msg.identityKey && { identityKey: msg.identityKey }),
-          capabilities: msg.capabilities ?? [],
-        } : a
-      ));
-      fetchAgents();
+      let isNewAgent = false;
+      setAgents(prev => {
+        const idx = prev.findIndex(a => a.id === msg.agentId);
+        if (idx === -1) {
+          isNewAgent = true;
+          return prev; // brand-new agent — fetch below will load it
+        }
+        const cur = prev[idx];
+        const newKey = msg.identityKey ?? cur.identityKey;
+        const newCaps = msg.capabilities ?? cur.capabilities;
+        const wasOnline = cur.online;
+        if (wasOnline && cur.identityKey === newKey && cur.capabilities === newCaps) return prev;
+        const next = [...prev];
+        next[idx] = { ...cur, online: true, identityKey: newKey, capabilities: newCaps };
+        return next;
+      });
+      // Only re-fetch when we don't yet have this agent in the store; otherwise
+      // the optimistic update above is sufficient (status / latency / sessions
+      // arrive via their own WS messages).
+      if (isNewAgent) fetchAgents();
     });
     const unsubOffline = subscribe('agent.offline', () => { fetchAgents(); });
     const unsubLatency = subscribe('agent.latency', (msg: AgentLatency) => {

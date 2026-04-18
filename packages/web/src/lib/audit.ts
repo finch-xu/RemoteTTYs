@@ -1,5 +1,3 @@
-import type { UITheme } from './theme';
-
 export const ACTION_LABELS: Record<string, string> = {
   login: 'Login',
   login_fail: 'Login Failed',
@@ -31,15 +29,13 @@ export const ACTION_CATEGORIES: Record<string, ActionCategory> = {
   session_create: 'session', session_close: 'session',
 };
 
-export function getCategoryColors(ui: UITheme): Record<ActionCategory, { bg: string; text: string }> {
-  return {
-    auth: { bg: `${ui.accent}20`, text: ui.accent },
-    user: { bg: `${ui.warning}20`, text: ui.warning },
-    agent: { bg: `${ui.online}20`, text: ui.online },
-    token: { bg: `${ui.textSecondary}18`, text: ui.textSecondary },
-    session: { bg: `${ui.accent}12`, text: ui.textMuted },
-  };
-}
+export const CATEGORY_COLORS: Record<ActionCategory, { bg: string; fg: string }> = {
+  auth: { bg: 'var(--warning-soft)', fg: 'var(--warning)' },
+  user: { bg: 'var(--accent-soft)', fg: 'var(--accent)' },
+  agent: { bg: 'var(--online-soft)', fg: 'var(--online)' },
+  token: { bg: 'var(--surface-alt)', fg: 'var(--text-secondary)' },
+  session: { bg: 'var(--accent-soft)', fg: 'var(--accent)' },
+};
 
 export const CATEGORY_LABELS: Record<ActionCategory, string> = {
   auth: 'Auth',
@@ -57,8 +53,15 @@ export const ACTIONS_BY_CATEGORY: Record<ActionCategory, string[]> = {
   session: ['session_create', 'session_close'],
 };
 
-export function relativeTime(isoDate: string): string {
-  const diff = Date.now() - new Date(isoDate + 'Z').getTime();
+// Parses both server-local "YYYY-MM-DD HH:MM:SS" (audit log format, needs 'Z')
+// and tz-aware ISO strings (REST responses, already anchored).
+function parseServerDate(iso: string): Date {
+  return /[zZ+]|\d{2}:\d{2}$/.test(iso) ? new Date(iso) : new Date(iso + 'Z');
+}
+
+export function relativeTime(iso: string | null, whenNull = 'never'): string {
+  if (!iso) return whenNull;
+  const diff = Date.now() - parseServerDate(iso).getTime();
   const seconds = Math.floor(diff / 1000);
   if (seconds < 60) return 'just now';
   const minutes = Math.floor(seconds / 60);
@@ -70,7 +73,7 @@ export function relativeTime(isoDate: string): string {
 }
 
 export function formatDateTime(isoDate: string): string {
-  const d = new Date(isoDate + 'Z');
+  const d = parseServerDate(isoDate);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }

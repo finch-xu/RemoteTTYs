@@ -105,18 +105,12 @@ export function useThemeProvider(initialPreferences?: Preferences) {
   const resolvedTheme = uiMode === 'system' ? systemTheme : uiMode;
   const ui = resolvedTheme === 'dark' ? darkTheme : lightTheme;
 
-  // Update body background + sync CSS custom properties for global rules
+  // CSS cascade (index.css) drives palette via <html data-theme="...">.
+  // No JS setProperty sync — all token values live in :root / [data-theme]
+  // blocks and flow through var(--*) references in every component.
   useEffect(() => {
-    document.body.style.background = ui.bg;
-    const root = document.documentElement;
-    root.setAttribute('data-theme', resolvedTheme);
-    root.style.setProperty('--rttys-accent', ui.accent);
-    root.style.setProperty('--rttys-bg', ui.bg);
-    root.style.setProperty('--rttys-surface', ui.surface);
-    root.style.setProperty('--rttys-border', ui.border);
-    root.style.setProperty('--rttys-surface-alt', ui.surfaceAlt);
-    root.style.setProperty('--rttys-text-secondary', ui.textSecondary);
-  }, [ui, resolvedTheme]);
+    document.documentElement.setAttribute('data-theme', resolvedTheme);
+  }, [resolvedTheme]);
 
   const savePreferences = useCallback((prefs: Preferences) => {
     apiFetch('/api/preferences', {

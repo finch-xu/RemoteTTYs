@@ -2,8 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Plus, Columns2 } from 'lucide-react';
 import { TerminalView } from './TerminalView';
 import { NewTerminalDialog } from './NewTerminalDialog';
-import { useTheme } from '../hooks/useTheme';
-import { MONO_FONT, getLatencyColor } from '../lib/theme';
+import { MONO_FONT } from '../lib/theme';
 import { generateECDHKeyPair, exportPublicKeyRaw, uint8ToBase64, computeCloseHMAC } from '../lib/e2e';
 import type { E2EKeyPairData } from '../lib/e2e';
 import type { PtyCreated, PtyExited, PtyCreateError, AgentOffline } from '../lib/protocol';
@@ -36,7 +35,6 @@ interface TerminalTabsProps {
 }
 
 export function TerminalTabs({ agentId, agentName, identityKey, existingSessions, clipboardAvailable, send, subscribe, compact, agentLatencyMs, relayLatencyMs }: TerminalTabsProps) {
-  const { ui } = useTheme();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [showNewDialog, setShowNewDialog] = useState(false);
@@ -312,19 +310,22 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
     <div
       key={s.sessionId}
       style={{
-        display: 'flex', alignItems: 'center', gap: 6, padding: compact ? '10px 14px' : '7px 14px', cursor: 'pointer',
-        fontSize: 13, fontFamily: MONO_FONT, whiteSpace: 'nowrap', userSelect: 'none', borderRadius: '6px 6px 0 0',
-        background: isActive ? ui.bg : 'transparent',
-        color: s.exited ? ui.textMuted : ui.textPrimary,
-        borderBottom: isActive ? `2px solid ${ui.accent}` : '2px solid transparent',
-        transition: 'background-color 0.15s ease, border-color 0.15s ease',
+        display: 'flex', alignItems: 'center', gap: 6, padding: compact ? '12px 14px' : '11px 14px', cursor: 'pointer',
+        fontSize: 13, fontFamily: MONO_FONT, whiteSpace: 'nowrap', userSelect: 'none',
+        background: isActive ? 'var(--bg)' : 'transparent',
+        color: s.exited ? 'var(--text-muted)' : isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+        borderBottom: isActive ? '2px solid var(--accent)' : '2px solid transparent',
+        transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
+        fontWeight: isActive ? 500 : 400,
       }}
       onClick={onActivate}
+      onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'var(--surface-alt)'; }}
+      onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
     >
       <span>{s.label}</span>
-      {s.exited && <span style={{ color: ui.textMuted, fontSize: 10, marginLeft: 4 }}>exited</span>}
+      {s.exited && <span style={{ color: 'var(--text-muted)', fontSize: 10, marginLeft: 4 }}>exited</span>}
       <button
-        style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', padding: compact ? '6px' : '4px', marginLeft: 2, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+        style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: compact ? '6px' : '4px', marginLeft: 2, lineHeight: 1, display: 'flex', alignItems: 'center', borderRadius: 4 }}
         onClick={(e) => { e.stopPropagation(); handleCloseTab(s.sessionId); }}
         title="Close terminal"
         aria-label="Close terminal"
@@ -339,8 +340,8 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
       style={{
         display: 'flex', alignItems: 'center', gap: 2, overflow: 'auto', padding: '0 4px',
         flex: 1, minWidth: 0,
-        borderBottom: focusedPane === pane ? `2px solid ${ui.accent}` : '2px solid transparent',
-        transition: 'border-color 0.15s ease',
+        boxShadow: focusedPane === pane ? 'inset 0 -2px 0 0 var(--accent)' : 'none',
+        transition: 'box-shadow 0.15s ease',
       }}
       onClick={() => setFocusedPane(pane)}
     >
@@ -350,7 +351,7 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
         setFocusedPane(pane);
       }))}
       <button
-        style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', padding: compact ? '10px' : '6px 10px', lineHeight: 1, display: 'flex', alignItems: 'center' }}
+        style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: compact ? '10px' : '6px 10px', lineHeight: 1, display: 'flex', alignItems: 'center', borderRadius: 4 }}
         onClick={() => { setFocusedPane(pane); setShowNewDialog(true); }}
         title="New terminal"
         aria-label={`New terminal (${pane} pane)`}
@@ -362,22 +363,33 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
 
   const canSplit = sessions.length >= 2 && !compact;
   const totalLatencyMs = agentLatencyMs !== null ? agentLatencyMs + (relayLatencyMs ?? 0) : null;
-  const latencyColor = getLatencyColor(totalLatencyMs, ui);
+  const latencyColor = totalLatencyMs == null
+    ? 'var(--text-muted)'
+    : totalLatencyMs < 60
+      ? 'var(--online)'
+      : totalLatencyMs < 150
+        ? 'var(--warning)'
+        : 'var(--error)';
+
+  const activeSession = split
+    ? sessions.find(s => s.sessionId === (focusedPane === 'left' ? split.leftActiveId : split.rightActiveId))
+    : sessions.find(s => s.sessionId === activeSessionId);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: ui.surface, borderBottom: `1px solid ${ui.border}`, height: compact ? 44 : 38, flexShrink: 0 }}>
+      {/* Top: breadcrumb + tab strip (unified 44px) */}
+      <div style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', background: 'var(--surface)', borderBottom: '1px solid var(--border)', height: 44, flexShrink: 0 }}>
         {split ? (
           <>
             {renderPaneGroup('left', leftSessions, split.leftActiveId)}
-            <div style={{ width: 1, height: 20, background: ui.border, flexShrink: 0, alignSelf: 'center' }} />
+            <div style={{ width: 1, background: 'var(--border)', flexShrink: 0, alignSelf: 'stretch' }} />
             {renderPaneGroup('right', rightSessions, split.rightActiveId)}
           </>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 2, overflow: 'auto', padding: '0 4px', flex: 1, minWidth: 0 }}>
             {sessions.map(s => renderTab(s, s.sessionId === activeSessionId, () => setActiveSessionId(s.sessionId)))}
             <button
-              style={{ background: 'none', border: 'none', color: ui.textSecondary, cursor: 'pointer', padding: compact ? '10px' : '6px 10px', lineHeight: 1, display: 'flex', alignItems: 'center' }}
+              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: compact ? '10px' : '6px 10px', lineHeight: 1, display: 'flex', alignItems: 'center', borderRadius: 4 }}
               onClick={() => setShowNewDialog(true)}
               title="New terminal"
               aria-label="New terminal"
@@ -386,12 +398,14 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
             </button>
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, paddingRight: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, paddingRight: 12 }}>
           {!compact && (
             <button
               style={{
-                background: 'none', border: 'none', cursor: canSplit || split ? 'pointer' : 'default',
-                color: split ? ui.accent : ui.textSecondary, padding: '2px 6px', lineHeight: 1,
+                background: split ? 'var(--accent-soft)' : 'transparent',
+                border: 'none', cursor: canSplit || split ? 'pointer' : 'default',
+                color: split ? 'var(--accent)' : 'var(--text-secondary)',
+                padding: '6px 8px', borderRadius: 6,
                 display: 'flex', alignItems: 'center', opacity: canSplit || split ? 1 : 0.3,
               }}
               onClick={handleSplit}
@@ -402,22 +416,8 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
               <Columns2 size={16} strokeWidth={1.75} />
             </button>
           )}
-          {!compact && totalLatencyMs !== null && (
-            <div
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginRight: 4, lineHeight: 1.2 }}
-              title={`Web \u2194 Relay: ${relayLatencyMs ?? '?'}ms\nRelay \u2194 Agent: ${agentLatencyMs}ms`}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontFamily: MONO_FONT }}>
-                <span style={{ color: latencyColor, fontSize: 8 }}>{'\u25cf'}</span>
-                <span style={{ color: latencyColor, fontWeight: 500 }}>{totalLatencyMs}ms</span>
-              </div>
-              <div style={{ fontSize: 10, color: ui.textMuted, fontFamily: MONO_FONT }}>
-                W:{relayLatencyMs ?? '?'} A:{agentLatencyMs}
-              </div>
-            </div>
-          )}
           {!compact && (
-            <span style={{ color: ui.textSecondary, fontSize: 12, fontFamily: MONO_FONT }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: 12, fontFamily: MONO_FONT }}>
               {agentName}
             </span>
           )}
@@ -429,7 +429,7 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
           <div style={{
             position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 20,
             padding: '6px 16px', borderRadius: 6, fontSize: 13, fontFamily: MONO_FONT,
-            background: ui.error, color: '#fff', whiteSpace: 'nowrap',
+            background: 'var(--error)', color: 'var(--accent-text)', whiteSpace: 'nowrap',
           }}>
             {createError}
           </div>
@@ -460,13 +460,46 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
             style={{
               position: 'absolute', top: 0, bottom: 0, zIndex: 10,
               left: `calc(${split.ratio * 100}% - 3px)`, width: 6,
-              cursor: 'col-resize', background: ui.border,
+              cursor: 'col-resize', background: 'var(--border)',
             }}
             onMouseDown={handleDividerMouseDown}
             onDoubleClick={handleDividerDoubleClick}
           />
         )}
       </div>
+
+      {/* Bottom status bar (28px) */}
+      {!compact && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 14,
+          height: 28, flexShrink: 0,
+          padding: '0 14px',
+          background: 'var(--surface)',
+          borderTop: '1px solid var(--border)',
+          fontSize: 11,
+          fontFamily: MONO_FONT,
+          color: 'var(--text-muted)',
+        }}>
+          {activeSession && (
+            <span title={activeSession.sessionId}>
+              {activeSession.sessionId.slice(0, 8)}
+              {activeSession.exited && <span style={{ color: 'var(--warning)', marginLeft: 6 }}>· exited</span>}
+            </span>
+          )}
+          <span>{sessions.length} session{sessions.length === 1 ? '' : 's'}</span>
+          <div style={{ flex: 1 }} />
+          {totalLatencyMs !== null && (
+            <span
+              title={`Web ↔ Relay: ${relayLatencyMs ?? '?'}ms · Relay ↔ Agent: ${agentLatencyMs}ms`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
+            >
+              <span style={{ color: latencyColor, fontSize: 8 }}>●</span>
+              <span style={{ color: latencyColor, fontWeight: 500 }}>{totalLatencyMs}ms</span>
+              <span style={{ color: 'var(--text-muted)' }}>W:{relayLatencyMs ?? '?'} A:{agentLatencyMs}</span>
+            </span>
+          )}
+        </div>
+      )}
 
       {showNewDialog && (
         <NewTerminalDialog

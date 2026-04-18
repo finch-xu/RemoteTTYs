@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useTheme } from '../hooks/useTheme';
 import { UI_FONT } from '../lib/theme';
+import { Button, PasswordStrength, scorePassword } from './primitives';
 
 interface SetupPageProps {
   onSetupComplete: () => void;
@@ -12,21 +12,37 @@ export function SetupPage({ onSetupComplete }: SetupPageProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { ui: t } = useTheme();
 
   const inputStyle: React.CSSProperties = {
-    background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8,
-    color: t.textPrimary, padding: '10px 14px', fontSize: 14, fontFamily: 'inherit',
+    background: 'var(--surface-alt)',
+    border: '1px solid var(--border)',
+    borderRadius: 8,
+    color: 'var(--text-primary)',
+    padding: '10px 12px',
+    fontSize: 14,
+    fontFamily: 'inherit',
+    outline: 'none',
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (!username.trim()) { setError('Username is required'); return; }
-    if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
-    if (password !== confirmPassword) { setError('Passwords do not match'); return; }
-
+    if (!username.trim()) {
+      setError('Username is required');
+      return;
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    if (scorePassword(password) < 2) {
+      setError('Please choose a stronger password (mix case, numbers, and symbols)');
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch('/api/setup/init', {
@@ -34,13 +50,11 @@ export function SetupPage({ onSetupComplete }: SetupPageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password }),
       });
-
       if (!res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         setError(data.error || 'Setup failed');
         return;
       }
-
       onSetupComplete();
     } catch {
       setError('Connection failed');
@@ -50,30 +64,105 @@ export function SetupPage({ onSetupComplete }: SetupPageProps) {
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100vw', height: '100vh', background: t.bg }}>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 320, padding: '0 20px', boxSizing: 'border-box', fontFamily: UI_FONT }}>
-        <h2 style={{ color: t.textPrimary, margin: '0 0 4px', fontSize: 22, fontWeight: 600 }}>
-          Welcome to RemoteTTYs
-        </h2>
-        <p style={{ color: t.textSecondary, fontSize: 13, margin: '0 0 12px' }}>
-          Create your admin account to get started.
-        </p>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: t.textSecondary }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100vw',
+        height: '100vh',
+        background: 'var(--bg)',
+        fontFamily: UI_FONT,
+        padding: 20,
+      }}
+    >
+      <form
+        onSubmit={handleSubmit}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          width: 380,
+          maxWidth: '100%',
+          padding: 32,
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 14,
+          boxShadow: 'var(--shadow-lg)',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <div
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 7,
+              background: 'var(--accent)',
+              color: 'var(--accent-text)',
+              display: 'grid',
+              placeItems: 'center',
+              fontFamily: '"JetBrains Mono Variable", monospace',
+              fontSize: 12,
+              fontWeight: 700,
+              boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.15)',
+            }}
+          >
+            ›_
+          </div>
+          <div style={{ lineHeight: 1.1 }}>
+            <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+              Welcome to RemoteTTYs
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Create your admin account</div>
+          </div>
+        </div>
+
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12.5, color: 'var(--text-secondary)' }}>
           Username
-          <input type="text" value={username} onChange={e => setUsername(e.target.value)} style={inputStyle} autoFocus />
+          <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} style={inputStyle} autoFocus />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: t.textSecondary }}>
+
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12.5, color: 'var(--text-secondary)' }}>
           Password
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} />
+          <PasswordStrength password={password} />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: t.textSecondary }}>
-          Confirm Password
-          <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle} />
+
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12.5, color: 'var(--text-secondary)' }}>
+          Confirm password
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            style={inputStyle}
+          />
         </label>
-        {error && <div style={{ color: t.error, fontSize: 13 }}>{error}</div>}
-        <button type="submit" style={{ background: t.accent, border: 'none', borderRadius: 8, color: t.accentText, padding: '10px', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, fontWeight: 500, opacity: loading ? 0.6 : 1 }} disabled={loading}>
-          {loading ? 'Creating...' : 'Create Admin Account'}
-        </button>
+
+        {error && (
+          <div
+            style={{
+              padding: '8px 12px',
+              background: 'var(--error-soft)',
+              color: 'var(--error)',
+              fontSize: 12.5,
+              fontWeight: 500,
+              borderRadius: 6,
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <Button
+          variant="primary"
+          size="lg"
+          type="submit"
+          disabled={loading}
+          style={{ justifyContent: 'center', marginTop: 4 }}
+        >
+          {loading ? 'Creating…' : 'Create admin account'}
+        </Button>
       </form>
     </div>
   );

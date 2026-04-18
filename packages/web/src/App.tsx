@@ -1,22 +1,25 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Monitor, Menu } from 'lucide-react';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useAgentStore } from './hooks/useAgentStore';
 import { useResponsive } from './hooks/useResponsive';
-import { ThemeContext, useTheme, useThemeProvider } from './hooks/useTheme';
-import { Sidebar } from './components/Sidebar';
+import { ThemeContext, useThemeProvider } from './hooks/useTheme';
+import { Sidebar, type AppView } from './components/Sidebar';
 import { TerminalTabs } from './components/TerminalTabs';
 import { LoginPage } from './components/LoginPage';
 import { SetupPage } from './components/SetupPage';
 import { SettingsPage } from './components/SettingsPage';
 import { AuditLogPage } from './components/AuditLogPage';
 import { UserManagementPage } from './components/UserManagementPage';
+import { DashboardPage } from './components/DashboardPage';
+import { AgentsPage } from './components/AgentsPage';
+import { CommandPalette } from './components/CommandPalette';
 import { FingerprintWarning } from './components/FingerprintWarning';
 import { checkAgentIdentity, acceptNewIdentity } from './lib/knownAgents';
 import type { TOFUResult } from './lib/knownAgents';
 import { UI_FONT } from './lib/theme';
+import * as Icons from './lib/icons';
+import { StatusDot, Button } from './components/primitives';
 
-type AppView = 'terminal' | 'settings' | 'audit' | 'users';
 type AuthState = 'loading' | 'authenticated' | 'unauthenticated';
 
 interface Preferences {
@@ -44,24 +47,25 @@ function App() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/setup/status').then(r => r.json()).then(d => d.needsSetup),
-      fetch('/api/auth/me').then(r => r.ok ? r.json() : null),
-    ]).then(([setup, meData]) => {
-      setNeedsSetup(setup);
-      if (meData) {
-        setAuthState('authenticated');
-        setPreferences(meData.preferences);
-        setUserInfo(parseUserInfo(meData));
-      } else {
+      fetch('/api/setup/status').then((r) => r.json()).then((d) => d.needsSetup),
+      fetch('/api/auth/me').then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([setup, meData]) => {
+        setNeedsSetup(setup);
+        if (meData) {
+          setAuthState('authenticated');
+          setPreferences(meData.preferences);
+          setUserInfo(parseUserInfo(meData));
+        } else {
+          setAuthState('unauthenticated');
+        }
+      })
+      .catch(() => {
+        setNeedsSetup(false);
         setAuthState('unauthenticated');
-      }
-    }).catch(() => {
-      setNeedsSetup(false);
-      setAuthState('unauthenticated');
-    });
+      });
   }, []);
 
-  // Handle 401 from API calls (session expired)
   useEffect(() => {
     const handler = () => setAuthState('unauthenticated');
     window.addEventListener('rttys:unauthorized', handler);
@@ -83,7 +87,15 @@ function App() {
   );
 }
 
-function AppContent({ authState, needsSetup, userInfo, setAuthState, setNeedsSetup, setPreferences, setUserInfo }: {
+function AppContent({
+  authState,
+  needsSetup,
+  userInfo,
+  setAuthState,
+  setNeedsSetup,
+  setPreferences,
+  setUserInfo,
+}: {
   authState: AuthState;
   needsSetup: boolean | null;
   userInfo: UserInfo | undefined;
@@ -92,41 +104,55 @@ function AppContent({ authState, needsSetup, userInfo, setAuthState, setNeedsSet
   setPreferences: (p: Preferences | undefined) => void;
   setUserInfo: (u: UserInfo | undefined) => void;
 }) {
-  const { ui } = useTheme();
-
-  // Loading
   if (needsSetup === null || authState === 'loading') {
     return (
-      <div style={{ ...loadingStyle, background: ui.bg, color: ui.textPrimary }}>
+      <div style={loadingStyle}>
         <div className="spinner" /> Loading...
       </div>
     );
   }
 
-  // First-time setup
   if (needsSetup) {
-    return <SetupPage onSetupComplete={() => { setNeedsSetup(false); setAuthState('authenticated'); }} />;
+    return (
+      <SetupPage
+        onSetupComplete={() => {
+          setNeedsSetup(false);
+          setAuthState('authenticated');
+        }}
+      />
+    );
   }
 
   if (authState !== 'authenticated') {
-    return <LoginPage onLogin={() => {
-      // Re-fetch preferences and user info after login
-      fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(data => {
-        if (data) {
-          setPreferences(data.preferences);
-          setUserInfo(parseUserInfo(data));
-        }
-      }).catch(() => {});
-      setAuthState('authenticated');
-    }} />;
+    return (
+      <LoginPage
+        onLogin={() => {
+          fetch('/api/auth/me')
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+              if (data) {
+                setPreferences(data.preferences);
+                setUserInfo(parseUserInfo(data));
+              }
+            })
+            .catch(() => {});
+          setAuthState('authenticated');
+        }}
+      />
+    );
   }
 
-  return <MainApp userInfo={userInfo} onLogout={async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    setAuthState('unauthenticated');
-    setPreferences(undefined);
-    setUserInfo(undefined);
-  }} />;
+  return (
+    <MainApp
+      userInfo={userInfo}
+      onLogout={async () => {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        setAuthState('unauthenticated');
+        setPreferences(undefined);
+        setUserInfo(undefined);
+      }}
+    />
+  );
 }
 
 interface FingerprintWarningState {
@@ -138,30 +164,53 @@ interface FingerprintWarningState {
 }
 
 function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLogout: () => void }) {
-  const { ui } = useTheme();
   const { connected, relayLatencyMs, send, subscribe } = useWebSocket();
   const { agents, selectedAgent, selectedAgentId, selectAgent, deleteAgent, fetchAgents } = useAgentStore(subscribe);
-  const [view, setView] = useState<AppView>('terminal');
+  const [view, setView] = useState<AppView>('dashboard');
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [fingerprintWarning, setFingerprintWarning] = useState<FingerprintWarningState | null>(null);
   const { isDesktop } = useResponsive();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const drawerMode = !isDesktop;
-  // Track which agent IDs we've already checked to avoid re-checking on every render
   const checkedAgentsRef = useRef<Set<string>>(new Set());
-  // Track agents that have been online — once mounted, keep TerminalTabs mounted
+  // Terminals stay mounted once online to preserve xterm state across tab switches
+  // (see CLAUDE.md). Pruned on agent deletion only, not on offline.
   const mountedAgentIdsRef = useRef<Set<string>>(new Set());
-  for (const agent of agents) {
-    if (agent.online) {
-      mountedAgentIdsRef.current.add(agent.id);
+  useEffect(() => {
+    const validIds = new Set(agents.map((a) => a.id));
+    for (const id of mountedAgentIdsRef.current) {
+      if (!validIds.has(id)) mountedAgentIdsRef.current.delete(id);
     }
-  }
+    for (const a of agents) {
+      if (a.online) mountedAgentIdsRef.current.add(a.id);
+    }
+  }, [agents]);
 
-  // TOFU: check agent identity when agent.online is received with identityKey
+  const closePalette = useCallback(() => setPaletteOpen(false), []);
+  const navigateView = useCallback((v: AppView) => setView(v), []);
+
+  // Global ⌘K / Ctrl+K for command palette
+  useEffect(() => {
+    function handle(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName;
+        const editable = target?.isContentEditable;
+        // Allow ⌘K from anywhere except text inputs / terminals
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || editable) return;
+        e.preventDefault();
+        setPaletteOpen(true);
+      }
+    }
+    window.addEventListener('keydown', handle);
+    return () => window.removeEventListener('keydown', handle);
+  }, []);
+
+  // TOFU: check agent identity
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const unsub = subscribe('agent.online', async (msg: any) => {
       if (!msg.identityKey) return;
-      // Only check once per agentId+identityKey combination
       const checkKey = `${msg.agentId}:${msg.identityKey}`;
       if (checkedAgentsRef.current.has(checkKey)) return;
       checkedAgentsRef.current.add(checkKey);
@@ -194,123 +243,201 @@ function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLog
     setFingerprintWarning(null);
   }, []);
 
-  if (!connected && view !== 'settings' && view !== 'audit' && view !== 'users') {
-    return (
-      <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary }}>
-        <div className="spinner" /> Connecting to relay...
-      </div>
-    );
-  }
+  const handleOpenAgent = useCallback(
+    (id: string) => {
+      selectAgent(id);
+      setView('terminal');
+    },
+    [selectAgent],
+  );
+
+  const showConnecting = !connected && view === 'terminal';
 
   return (
-    <div style={{ display: 'flex', width: '100vw', height: '100vh', background: ui.bg }}>
+    <div style={{ display: 'flex', width: '100vw', height: '100vh', background: 'var(--bg)' }}>
       <Sidebar
         agents={agents}
         selectedAgentId={selectedAgentId}
-        onSelectAgent={(id) => { selectAgent(id); setView('terminal'); }}
+        onSelectAgent={handleOpenAgent}
         currentView={view}
         onViewChange={setView}
         onLogout={onLogout}
+        username={userInfo?.username ?? ''}
         userRole={userInfo?.role ?? 'user'}
         relayLatencyMs={relayLatencyMs}
         drawerMode={drawerMode}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        onOpenPalette={() => setPaletteOpen(true)}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {drawerMode && (
-          <div style={{
-            display: 'flex', alignItems: 'center', height: 44, flexShrink: 0,
-            padding: '0 12px', gap: 12,
-            background: ui.surface, borderBottom: `1px solid ${ui.border}`,
-            fontFamily: UI_FONT,
-          }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              height: 44,
+              flexShrink: 0,
+              padding: '0 12px',
+              gap: 12,
+              background: 'var(--surface)',
+              borderBottom: '1px solid var(--border)',
+              fontFamily: UI_FONT,
+            }}
+          >
             <button
               onClick={() => setSidebarOpen(true)}
               aria-label="Open menu"
-              style={{ background: 'none', border: 'none', padding: 6, cursor: 'pointer', color: ui.textPrimary, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 6,
+                cursor: 'pointer',
+                color: 'var(--text-primary)',
+                lineHeight: 1,
+                display: 'flex',
+                alignItems: 'center',
+              }}
             >
-              <Menu size={20} strokeWidth={1.75} />
+              <Icons.Menu size={20} strokeWidth={1.75} />
             </button>
-            <span style={{ fontSize: 13, color: ui.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {selectedAgent?.name ?? 'RemoteTTYs'}
+            <span
+              style={{
+                fontSize: 13,
+                color: 'var(--text-secondary)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {view === 'terminal' ? selectedAgent?.name ?? 'RemoteTTYs' : 'RemoteTTYs'}
             </span>
+            <button
+              onClick={() => setPaletteOpen(true)}
+              aria-label="Quick connect"
+              style={{
+                marginLeft: 'auto',
+                background: 'none',
+                border: 'none',
+                padding: 6,
+                cursor: 'pointer',
+                color: 'var(--text-secondary)',
+                lineHeight: 0,
+              }}
+            >
+              <Icons.Search size={18} />
+            </button>
           </div>
         )}
-        {view === 'settings' ? (
-          <SettingsPage onAgentDeleted={fetchAgents} userRole={userInfo?.role ?? 'user'} />
+
+        {view === 'dashboard' ? (
+          <DashboardPage
+            agents={agents}
+            relayLatencyMs={relayLatencyMs}
+            onOpenAgent={handleOpenAgent}
+            onOpenPalette={() => setPaletteOpen(true)}
+            onOpenAgentsPage={() => setView(userInfo?.role === 'admin' ? 'agents' : 'settings')}
+            userRole={userInfo?.role ?? 'user'}
+          />
+        ) : view === 'settings' ? (
+          <SettingsPage onNavigate={navigateView} />
         ) : view === 'users' ? (
           <UserManagementPage />
         ) : view === 'audit' ? (
           <AuditLogPage userRole={userInfo?.role ?? 'user'} />
+        ) : view === 'agents' ? (
+          <AgentsPage onAgentDeleted={fetchAgents} />
+        ) : showConnecting ? (
+          <div style={statusStyle}>
+            <div className="spinner" /> Connecting to relay...
+          </div>
         ) : agents.length === 0 ? (
-          <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary, flexDirection: 'column', gap: 16 }}>
-            <Monitor size={36} strokeWidth={1.5} color={ui.textMuted} />
-            <div>No agents registered</div>
-            <div style={{ fontSize: 13, color: ui.textSecondary, maxWidth: 320, textAlign: 'center', lineHeight: 1.5 }}>
+          <div style={{ ...statusStyle, flexDirection: 'column', gap: 16 }}>
+            <Icons.Terminal size={36} strokeWidth={1.5} />
+            <div style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 500 }}>
+              No agents registered
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: 'var(--text-secondary)',
+                maxWidth: 320,
+                textAlign: 'center',
+                lineHeight: 1.5,
+              }}
+            >
               Create a token in Settings to connect your first agent.
             </div>
-            <button
-              onClick={() => setView('settings')}
-              style={{ marginTop: 8, padding: '8px 20px', borderRadius: 6, border: 'none', background: ui.textPrimary, color: ui.bg, fontSize: 13, fontFamily: UI_FONT, cursor: 'pointer', fontWeight: 500 }}
-            >
+            <Button variant="primary" onClick={() => setView('settings')}>
               Go to Settings
-            </button>
+            </Button>
           </div>
         ) : !selectedAgent ? (
-          <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary }}>
-            <span style={{ color: ui.warning, fontSize: 20 }}>{'\u25cf'}</span> Waiting for agent to connect...
+          <div style={statusStyle}>
+            <StatusDot online={false} size={10} /> Waiting for agent to connect...
           </div>
         ) : !selectedAgent.online ? (
-          <div style={{ ...statusStyle, background: ui.bg, color: ui.textPrimary, flexDirection: 'column', gap: 12 }}>
-            <span style={{ color: ui.textMuted, fontSize: 32 }}>{'\u25cf'}</span>
-            <div style={{ fontSize: 16, fontWeight: 500 }}>{selectedAgent.name}</div>
-            <div style={{ fontSize: 13, color: ui.textSecondary }}>
+          <div style={{ ...statusStyle, flexDirection: 'column', gap: 12 }}>
+            <StatusDot online={false} size={14} />
+            <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>
+              {selectedAgent.name}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
               This agent is offline
               {selectedAgent.lastSeen && (
                 <span> &middot; Last seen {new Date(selectedAgent.lastSeen).toLocaleString()}</span>
               )}
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <button
-                onClick={() => deleteAgent(selectedAgent.id)}
-                style={{ padding: '6px 16px', borderRadius: 6, border: `1px solid ${ui.border}`, background: 'transparent', color: ui.error, fontSize: 13, fontFamily: UI_FONT, cursor: 'pointer' }}
-              >
+              <Button variant="danger" onClick={() => deleteAgent(selectedAgent.id)}>
                 Delete Agent
-              </button>
-              <button
-                onClick={() => setView('settings')}
-                style={{ padding: '6px 16px', borderRadius: 6, border: `1px solid ${ui.border}`, background: 'transparent', color: ui.textSecondary, fontSize: 13, fontFamily: UI_FONT, cursor: 'pointer' }}
-              >
+              </Button>
+              <Button variant="secondary" onClick={() => setView('settings')}>
                 Go to Settings
-              </button>
+              </Button>
             </div>
           </div>
         ) : null}
-        {agents.filter(a => mountedAgentIdsRef.current.has(a.id)).map(agent => (
-          <div
-            key={agent.id}
-            style={{
-              flex: 1,
-              display: view === 'terminal' && agent.id === selectedAgentId && agent.online ? 'flex' : 'none',
-              flexDirection: 'column',
-            }}
-          >
-            <TerminalTabs
-              agentId={agent.id}
-              agentName={agent.name}
-              identityKey={agent.identityKey}
-              existingSessions={agent.sessions}
-              clipboardAvailable={agent.capabilities.includes('clipboard')}
-              send={send}
-              subscribe={subscribe}
-              compact={drawerMode}
-              agentLatencyMs={agent.latencyMs}
-              relayLatencyMs={relayLatencyMs}
-            />
-          </div>
-        ))}
+
+        {agents
+          .filter((a) => mountedAgentIdsRef.current.has(a.id))
+          .map((agent) => (
+            <div
+              key={agent.id}
+              style={{
+                flex: 1,
+                display:
+                  view === 'terminal' && agent.id === selectedAgentId && agent.online
+                    ? 'flex'
+                    : 'none',
+                flexDirection: 'column',
+              }}
+            >
+              <TerminalTabs
+                agentId={agent.id}
+                agentName={agent.name}
+                identityKey={agent.identityKey}
+                existingSessions={agent.sessions}
+                clipboardAvailable={agent.capabilities.includes('clipboard')}
+                send={send}
+                subscribe={subscribe}
+                compact={drawerMode}
+                agentLatencyMs={agent.latencyMs}
+                relayLatencyMs={relayLatencyMs}
+              />
+            </div>
+          ))}
       </div>
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={closePalette}
+        agents={agents}
+        onSelectAgent={handleOpenAgent}
+        onNavigate={navigateView}
+        userRole={userInfo?.role ?? 'user'}
+      />
+
       {fingerprintWarning && (
         <FingerprintWarning
           agentName={fingerprintWarning.agentName}
@@ -333,6 +460,8 @@ const loadingStyle: React.CSSProperties = {
   fontFamily: UI_FONT,
   fontSize: 16,
   gap: 8,
+  background: 'var(--bg)',
+  color: 'var(--text-primary)',
 };
 
 const statusStyle: React.CSSProperties = {
@@ -340,10 +469,11 @@ const statusStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   flex: 1,
-  height: '100vh',
   fontFamily: UI_FONT,
   fontSize: 16,
   gap: 8,
+  background: 'var(--bg)',
+  color: 'var(--text-primary)',
 };
 
 export default App;

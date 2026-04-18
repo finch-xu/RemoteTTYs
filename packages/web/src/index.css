@@ -5,12 +5,12 @@
   font-display: swap;
 }
 
-/* Design tokens — light (default). Ported from design handoff `index.html`.
-   `--rttys-*` is the existing app convention; design-native aliases (`--bg`,
-   `--surface`, ...) point at the same values so future design ports can use
-   either name interchangeably. The JS theme in hooks/useTheme.ts keeps writing
-   a subset of `--rttys-*` via style.setProperty — those inline writes win by
-   specificity, so the accent switch still flows through at runtime. */
+/* Design tokens — light (default). Ported from Claude Design handoff.
+   `--rttys-*` is the legacy app convention; design-native aliases (`--bg`,
+   `--surface`, ...) reference the same values. Components use the short
+   aliases in inline styles (`background: var(--accent)`). CSS cascade via
+   <html data-theme="..."> and [data-accent="..."] handles theme switches;
+   no JS setProperty is needed. */
 :root {
   --rttys-bg: #FAF7F2;
   --rttys-surface: #FFFFFF;
@@ -24,10 +24,14 @@
   --rttys-accent: #C4704B;
   --rttys-accent-hover: #B5613E;
   --rttys-accent-soft: rgba(196, 112, 75, 0.12);
+  --rttys-accent-text: #FFFFFF;
   --rttys-online: #5BA37C;
   --rttys-online-soft: rgba(91, 163, 124, 0.15);
   --rttys-error: #D64545;
+  --rttys-error-soft: rgba(214, 69, 69, 0.10);
   --rttys-warning: #D4930D;
+  --rttys-warning-soft: rgba(212, 147, 13, 0.12);
+  --rttys-overlay: rgba(45, 43, 40, 0.40);
 
   --bg: var(--rttys-bg);
   --surface: var(--rttys-surface);
@@ -41,10 +45,14 @@
   --accent: var(--rttys-accent);
   --accent-hover: var(--rttys-accent-hover);
   --accent-soft: var(--rttys-accent-soft);
+  --accent-text: var(--rttys-accent-text);
   --online: var(--rttys-online);
   --online-soft: var(--rttys-online-soft);
   --error: var(--rttys-error);
+  --error-soft: var(--rttys-error-soft);
   --warning: var(--rttys-warning);
+  --warning-soft: var(--rttys-warning-soft);
+  --overlay: var(--rttys-overlay);
 
   --term-bg: #1C1917;
   --term-fg: #E7E5E4;
@@ -86,7 +94,10 @@
   --rttys-online: #6BC992;
   --rttys-online-soft: rgba(107, 201, 146, 0.15);
   --rttys-error: #EF6B6B;
+  --rttys-error-soft: rgba(239, 107, 107, 0.14);
   --rttys-warning: #E8B04A;
+  --rttys-warning-soft: rgba(232, 176, 74, 0.14);
+  --rttys-overlay: rgba(0, 0, 0, 0.50);
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.15);
@@ -108,11 +119,13 @@
   --rttys-accent: #2D2B28;
   --rttys-accent-hover: #1A1714;
   --rttys-accent-soft: rgba(45, 43, 40, 0.08);
+  --rttys-accent-text: #FFFFFF;
 }
 [data-theme="dark"][data-accent="mono"] {
   --rttys-accent: #EDE7DF;
   --rttys-accent-hover: #FFFFFF;
   --rttys-accent-soft: rgba(237, 231, 223, 0.1);
+  --rttys-accent-text: #1A1714;
 }
 
 * {
