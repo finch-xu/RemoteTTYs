@@ -8,13 +8,16 @@ export interface UITheme {
   surfaceAlt: string;
   surfaceActive: string;
   border: string;
+  borderStrong: string;
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
   accent: string;
   accentHover: string;
+  accentSoft: string;
   accentText: string;
   online: string;
+  onlineSoft: string;
   error: string;
   warning: string;
   overlay: string;
@@ -26,31 +29,37 @@ export const lightTheme: UITheme = {
   surfaceAlt: '#F3EDE5',
   surfaceActive: '#EDE5DA',
   border: '#E8E0D8',
+  borderStrong: '#D8CFC5',
   textPrimary: '#2D2B28',
-  textSecondary: '#8C8580',
+  textSecondary: '#7A736D',
   textMuted: '#B5AFA8',
   accent: '#C4704B',
   accentHover: '#B5613E',
+  accentSoft: 'rgba(196,112,75,0.12)',
   accentText: '#FFFFFF',
   online: '#5BA37C',
+  onlineSoft: 'rgba(91,163,124,0.15)',
   error: '#D64545',
   warning: '#D4930D',
   overlay: 'rgba(45,43,40,0.4)',
 };
 
 export const darkTheme: UITheme = {
-  bg: '#1A1A1A',
-  surface: '#2A2A2A',
-  surfaceAlt: '#333333',
-  surfaceActive: '#3D3D3D',
-  border: '#404040',
-  textPrimary: '#E5E5E5',
-  textSecondary: '#999999',
-  textMuted: '#808080',
+  bg: '#1A1714',
+  surface: '#24201C',
+  surfaceAlt: '#2D2822',
+  surfaceActive: '#38322B',
+  border: '#3A332D',
+  borderStrong: '#4A4139',
+  textPrimary: '#EDE7DF',
+  textSecondary: '#9C948B',
+  textMuted: '#6B635C',
   accent: '#D4845A',
   accentHover: '#E0956B',
+  accentSoft: 'rgba(212,132,90,0.15)',
   accentText: '#FFFFFF',
   online: '#6BC992',
+  onlineSoft: 'rgba(107,201,146,0.15)',
   error: '#EF6B6B',
   warning: '#E8B04A',
   overlay: 'rgba(0,0,0,0.5)',
@@ -58,7 +67,7 @@ export const darkTheme: UITheme = {
 
 export type UIThemeMode = 'light' | 'dark' | 'system';
 
-export const UI_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+export const UI_FONT = '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 export const MONO_FONT = 'Menlo, Monaco, "Courier New", monospace';
 
 export const FONT_FAMILIES = [
