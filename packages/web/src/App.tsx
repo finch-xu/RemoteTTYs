@@ -406,8 +406,12 @@ function MainApp({ userInfo, onLogout }: { userInfo: UserInfo | undefined; onLog
               key={agent.id}
               style={{
                 flex: 1,
+                // `connected` gate: while WebSocket is reconnecting, hide TerminalTabs so
+                // the "Connecting to relay..." status takes full space. Without this guard
+                // both render simultaneously (each flex:1) and split the viewport in half.
+                // Display toggle keeps xterm state mounted per CLAUDE.md convention.
                 display:
-                  view === 'terminal' && agent.id === selectedAgentId && agent.online
+                  connected && view === 'terminal' && agent.id === selectedAgentId && agent.online
                     ? 'flex'
                     : 'none',
                 flexDirection: 'column',
