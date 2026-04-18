@@ -102,9 +102,10 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 	// --- E2E key exchange ---
 	if msg.PublicKey == "" {
 		c.Send(PtyErrorMsg{
-			Type:      "pty.error",
-			SessionID: msg.SessionID,
-			Error:     "encryption required: missing publicKey",
+			Type:        "pty.error",
+			SessionID:   msg.SessionID,
+			Error:       "encryption required: missing publicKey",
+			ClientReqID: msg.ClientReqID,
 		})
 		return
 	}
@@ -113,9 +114,10 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 	if err != nil {
 		log.Printf("session %s: invalid browser publicKey base64: %v", msg.SessionID, err)
 		c.Send(PtyErrorMsg{
-			Type:      "pty.error",
-			SessionID: msg.SessionID,
-			Error:     "invalid publicKey encoding",
+			Type:        "pty.error",
+			SessionID:   msg.SessionID,
+			Error:       "invalid publicKey encoding",
+			ClientReqID: msg.ClientReqID,
 		})
 		return
 	}
@@ -124,9 +126,10 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 	if err != nil {
 		log.Printf("session %s: invalid browser ECDH key: %v", msg.SessionID, err)
 		c.Send(PtyErrorMsg{
-			Type:      "pty.error",
-			SessionID: msg.SessionID,
-			Error:     "invalid publicKey",
+			Type:        "pty.error",
+			SessionID:   msg.SessionID,
+			Error:       "invalid publicKey",
+			ClientReqID: msg.ClientReqID,
 		})
 		return
 	}
@@ -135,9 +138,10 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 	if err != nil {
 		log.Printf("session %s: ECDH key generation failed: %v", msg.SessionID, err)
 		c.Send(PtyErrorMsg{
-			Type:      "pty.error",
-			SessionID: msg.SessionID,
-			Error:     "session key negotiation failed",
+			Type:        "pty.error",
+			SessionID:   msg.SessionID,
+			Error:       "session key negotiation failed",
+			ClientReqID: msg.ClientReqID,
 		})
 		return
 	}
@@ -147,9 +151,10 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 	if err != nil {
 		log.Printf("session %s: ECDH shared secret failed: %v", msg.SessionID, err)
 		c.Send(PtyErrorMsg{
-			Type:      "pty.error",
-			SessionID: msg.SessionID,
-			Error:     "session key negotiation failed",
+			Type:        "pty.error",
+			SessionID:   msg.SessionID,
+			Error:       "session key negotiation failed",
+			ClientReqID: msg.ClientReqID,
 		})
 		return
 	}
@@ -158,9 +163,10 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 	if err != nil {
 		log.Printf("session %s: key derivation failed: %v", msg.SessionID, err)
 		c.Send(PtyErrorMsg{
-			Type:      "pty.error",
-			SessionID: msg.SessionID,
-			Error:     "session key negotiation failed",
+			Type:        "pty.error",
+			SessionID:   msg.SessionID,
+			Error:       "session key negotiation failed",
+			ClientReqID: msg.ClientReqID,
 		})
 		return
 	}
@@ -179,9 +185,10 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 	if err != nil {
 		log.Printf("session %s: rejected shell: %v", msg.SessionID, err)
 		c.Send(PtyErrorMsg{
-			Type:      "pty.error",
-			SessionID: msg.SessionID,
-			Error:     fmt.Sprintf("shell rejected: %s", err.Error()),
+			Type:        "pty.error",
+			SessionID:   msg.SessionID,
+			Error:       fmt.Sprintf("shell rejected: %s", err.Error()),
+			ClientReqID: msg.ClientReqID,
 		})
 		return
 	}
@@ -214,9 +221,10 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 	if err != nil {
 		log.Printf("failed to start pty for session %s: %v", msg.SessionID, err)
 		c.Send(PtyErrorMsg{
-			Type:      "pty.error",
-			SessionID: msg.SessionID,
-			Error:     "failed to start terminal session",
+			Type:        "pty.error",
+			SessionID:   msg.SessionID,
+			Error:       "failed to start terminal session",
+			ClientReqID: msg.ClientReqID,
 		})
 		return
 	}
@@ -243,11 +251,12 @@ func (c *Client) handlePtyCreate(msg IncomingMessage) {
 	c.writeStatusFile()
 
 	c.Send(PtyCreatedMsg{
-		Type:      "pty.created",
-		SessionID: msg.SessionID,
-		PID:       ptyHandle.Pid(),
-		PublicKey: base64.StdEncoding.EncodeToString(agentPubRaw),
-		Signature: base64.StdEncoding.EncodeToString(signature),
+		Type:        "pty.created",
+		SessionID:   msg.SessionID,
+		PID:         ptyHandle.Pid(),
+		PublicKey:   base64.StdEncoding.EncodeToString(agentPubRaw),
+		Signature:   base64.StdEncoding.EncodeToString(signature),
+		ClientReqID: msg.ClientReqID,
 	})
 
 	log.Printf("session %s created (pid=%d, shell=%s, e2e=on)", msg.SessionID, ptyHandle.Pid(), shell)

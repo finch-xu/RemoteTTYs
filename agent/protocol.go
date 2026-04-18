@@ -3,19 +3,20 @@ package main
 // IncomingMessage is a single struct for all messages from relay.
 // Dispatch by the Type field.
 type IncomingMessage struct {
-	Type       string  `json:"type"`
-	SessionID  string  `json:"sessionId,omitempty"`
-	Payload    string  `json:"payload,omitempty"`
-	Shell      string  `json:"shell,omitempty"`
-	Cwd        string  `json:"cwd,omitempty"`
-	Cols       int     `json:"cols,omitempty"`
-	Rows       int     `json:"rows,omitempty"`
-	PublicKey  string  `json:"publicKey,omitempty"` // ECDH P-256 public key (base64)
-	Hmac       string  `json:"hmac,omitempty"`      // HMAC-SHA256 for control messages
-	PingID     string  `json:"id,omitempty"`         // ping/pong correlation ID
-	Timestamp  float64 `json:"timestamp,omitempty"`  // relay timestamp for RTT measurement
-	TransferID string  `json:"transferId,omitempty"` // file transfer correlation ID
-	ChunkIndex int     `json:"chunkIndex,omitempty"` // file transfer chunk index (0-based)
+	Type        string  `json:"type"`
+	SessionID   string  `json:"sessionId,omitempty"`
+	Payload     string  `json:"payload,omitempty"`
+	Shell       string  `json:"shell,omitempty"`
+	Cwd         string  `json:"cwd,omitempty"`
+	Cols        int     `json:"cols,omitempty"`
+	Rows        int     `json:"rows,omitempty"`
+	PublicKey   string  `json:"publicKey,omitempty"`   // ECDH P-256 public key (base64)
+	Hmac        string  `json:"hmac,omitempty"`        // HMAC-SHA256 for control messages
+	PingID      string  `json:"id,omitempty"`          // ping/pong correlation ID
+	Timestamp   float64 `json:"timestamp,omitempty"`   // relay timestamp for RTT measurement
+	TransferID  string  `json:"transferId,omitempty"`  // file transfer correlation ID
+	ChunkIndex  int     `json:"chunkIndex,omitempty"`  // file transfer chunk index (0-based)
+	ClientReqID string  `json:"clientReqId,omitempty"` // browser-supplied correlation ID for pty.create
 }
 
 // Outgoing messages — each has its own struct for clean JSON marshaling.
@@ -35,17 +36,19 @@ type ServerChallengeMsg struct {
 }
 
 type PtyCreatedMsg struct {
-	Type      string `json:"type"`
-	SessionID string `json:"sessionId"`
-	PID       int    `json:"pid"`
-	PublicKey string `json:"publicKey"` // ECDH P-256 public key (base64)
-	Signature string `json:"signature"` // Ed25519 signature (base64)
+	Type        string `json:"type"`
+	SessionID   string `json:"sessionId"`
+	PID         int    `json:"pid"`
+	PublicKey   string `json:"publicKey"`             // ECDH P-256 public key (base64)
+	Signature   string `json:"signature"`             // Ed25519 signature (base64)
+	ClientReqID string `json:"clientReqId,omitempty"` // echoed back from pty.create for browser-side correlation
 }
 
 type PtyErrorMsg struct {
-	Type      string `json:"type"`
-	SessionID string `json:"sessionId"`
-	Error     string `json:"error"`
+	Type        string `json:"type"`
+	SessionID   string `json:"sessionId"`
+	Error       string `json:"error"`
+	ClientReqID string `json:"clientReqId,omitempty"` // echoed back from pty.create when error occurs before sessionId allocation
 }
 
 type PtyDataMsg struct {

@@ -97,6 +97,7 @@ export function handleAgentMessage(agentId: string, msg: AgentMessage) {
         sessionId: msg.sessionId,
         publicKey: msg.publicKey,
         signature: msg.signature,
+        ...(msg.clientReqId && { clientReqId: msg.clientReqId }),
       });
       for (const browserId of mapping.browserIds) {
         const browser = getBrowser(browserId);
@@ -150,6 +151,23 @@ export function handleAgentMessage(agentId: string, msg: AgentMessage) {
       const m = msg as PtyError;
       const errorMapping = sessions.get(m.sessionId);
       if (!errorMapping || errorMapping.agentId !== agentId) break;
+      // Early-lifecycle failures: agent rejected pty.create before TerminalView mounted.
+      // Forward as pty.create.error so the browser can clean up its pending keyPair Map
+      // entry (otherwise the entry leaks until the 30s timeout fires).
+      if (m.clientReqId) {
+        for (const browserId of errorMapping.browserIds) {
+          sendToBrowser(browserId, {
+            type: 'pty.create.error',
+            agentId,
+            error: m.error,
+            clientReqId: m.clientReqId,
+          });
+        }
+        // Session never started on agent — drop the relay-side mapping so the
+        // sessionId isn't leaked in the sessions Map.
+        destroySession(m.sessionId, agentId, `sessionId=${m.sessionId}, reason=create_failed_on_agent`, false);
+        break;
+      }
       sendToSessionSubscribers(m.sessionId, {
         type: 'pty.error',
         agentId,
@@ -182,7 +200,12 @@ export function handleBrowserMessage(browserId: string, msg: BrowserMessage) {
     case 'pty.create': {
       const m = msg as BrowserPtyCreate;
       const createError = (error: string) => {
-        sendToBrowser(browserId, { type: 'pty.create.error', agentId: m.agentId, error });
+        sendToBrowser(browserId, {
+          type: 'pty.create.error',
+          agentId: m.agentId,
+          error,
+          ...(m.clientReqId && { clientReqId: m.clientReqId }),
+        });
       };
       const agent = getAgent(m.agentId);
       if (!agent) {
@@ -258,13 +281,14 @@ export function handleBrowserMessage(browserId: string, msg: BrowserMessage) {
       // Track on agent
       agent.sessions.add(sessionId);
 
-      // Forward to agent (strip agentId, add sessionId)
+      // Forward to agent (strip agentId, add sessionId, preserve clientReqId for browser correlation)
       sendToAgent(m.agentId, {
         type: 'pty.create',
         sessionId,
         shell,
         cwd,
         publicKey: m.publicKey,
+        ...(m.clientReqId && { clientReqId: m.clientReqId }),
       });
 
       const browserConn = getBrowser(browserId);

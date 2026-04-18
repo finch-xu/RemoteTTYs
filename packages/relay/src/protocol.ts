@@ -30,6 +30,7 @@ export interface PtyCreated extends BaseMessage {
   pid: number;
   publicKey: string;  // ECDH P-256 public key (base64)
   signature: string;  // Ed25519 signature (base64)
+  clientReqId?: string; // browser-supplied correlation ID, echoed by agent
 }
 
 export interface PtyData extends BaseMessage {
@@ -54,6 +55,7 @@ export interface PtyError extends BaseMessage {
   type: 'pty.error';
   sessionId: string;
   error: string;
+  clientReqId?: string; // present when error occurred during pty.create handling on agent
 }
 
 // File transfer: Agent → Relay (→ Browser)
@@ -96,6 +98,7 @@ export interface PtyCreate extends BaseMessage {
   shell: string;
   cwd: string;
   publicKey: string; // ECDH P-256 public key (base64)
+  clientReqId?: string; // browser-supplied correlation ID, forwarded to agent
 }
 
 export interface PtyResize extends BaseMessage {
@@ -133,6 +136,7 @@ export interface BrowserPtyCreate extends BaseMessage {
   shell: string;
   cwd: string;
   publicKey: string; // ECDH P-256 public key (base64)
+  clientReqId?: string; // browser-supplied correlation ID for matching pty.created back to a keyPair
 }
 
 export interface BrowserPtyData extends BaseMessage {
@@ -215,6 +219,7 @@ export interface RelayPtyCreated extends BaseMessage {
   sessionId: string;
   publicKey: string;
   signature: string;
+  clientReqId?: string; // forwarded from agent
 }
 
 export interface RelayPtyData extends BaseMessage {
@@ -292,6 +297,7 @@ export interface RelayPtyCreateError extends BaseMessage {
   type: 'pty.create.error';
   agentId: string;
   error: string;
+  clientReqId?: string; // present so browser can clean up the pending keyPair Map entry
 }
 
 export type RelayToBrowserMessage =

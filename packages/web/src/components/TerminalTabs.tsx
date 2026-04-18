@@ -49,7 +49,11 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
   focusedPaneRef.current = focusedPane;
   const dragCleanupRef = useRef<(() => void) | null>(null);
 
-  const pendingKeyPairsRef = useRef<E2EKeyPairData[]>([]);
+  // Maps clientReqId → keyPair so pty.created can find the right keyPair regardless
+  // of message ordering. Replaces the previous FIFO array, which silently corrupted
+  // the keyPair↔sessionId binding whenever any in-flight pty.create error or race
+  // shifted the queue out of sync (root cause of "second session E2E verify fails").
+  const pendingKeyPairsRef = useRef<Map<string, E2EKeyPairData>>(new Map());
   const sessionKeyPairsRef = useRef<Map<string, E2EKeyPairData>>(new Map());
   const agentKeyExchangeRef = useRef<Map<string, { publicKey: string; signature: string }>>(new Map());
   const sessionHmacKeysRef = useRef<Map<string, CryptoKey>>(new Map());
@@ -61,8 +65,12 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
   const createSession = useCallback(async (shell: string, cwd: string) => {
     const keyPair = await generateECDHKeyPair();
     const publicKeyRaw = await exportPublicKeyRaw(keyPair.publicKey);
-    pendingKeyPairsRef.current.push({ keyPair, publicKeyRaw });
-    send({ type: 'pty.create', agentId, shell, cwd, publicKey: uint8ToBase64(publicKeyRaw) });
+    const clientReqId = crypto.randomUUID();
+    pendingKeyPairsRef.current.set(clientReqId, { keyPair, publicKeyRaw });
+    // Bound memory: drop the entry if no pty.created/error response arrives in 30s.
+    // Real round-trips are sub-second; 30s is generous slack.
+    setTimeout(() => pendingKeyPairsRef.current.delete(clientReqId), 30_000);
+    send({ type: 'pty.create', agentId, shell, cwd, publicKey: uint8ToBase64(publicKeyRaw), clientReqId });
   }, [agentId, send]);
 
   useEffect(() => {
@@ -80,9 +88,17 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
   useEffect(() => {
     const unsub = subscribe('pty.created', (msg: PtyCreated) => {
       if (msg.agentId !== agentId) return;
-      const pendingKP = pendingKeyPairsRef.current.shift();
-      if (pendingKP) {
+      // Match the keyPair by the clientReqId we generated in createSession. This
+      // is robust against message reordering, retries, and StrictMode double-mounts —
+      // the pre-fix FIFO shift assumed push-order == response-order, which broke
+      // whenever any pty.create.error or other race consumed the queue head.
+      const reqId = msg.clientReqId;
+      const pendingKP = reqId ? pendingKeyPairsRef.current.get(reqId) : undefined;
+      if (reqId && pendingKP) {
+        pendingKeyPairsRef.current.delete(reqId);
         sessionKeyPairsRef.current.set(msg.sessionId, pendingKP);
+      } else if (!reqId) {
+        console.error('[E2E] pty.created missing clientReqId — agent/relay version mismatch?');
       }
       if (msg.publicKey && msg.signature) {
         agentKeyExchangeRef.current.set(msg.sessionId, { publicKey: msg.publicKey, signature: msg.signature });
@@ -161,7 +177,12 @@ export function TerminalTabs({ agentId, agentName, identityKey, existingSessions
   useEffect(() => {
     const unsub = subscribe('pty.create.error', (msg: PtyCreateError) => {
       if (msg.agentId !== agentId) return;
-      pendingKeyPairsRef.current.shift();
+      // Drop the specific keyPair tied to this failed request. If no clientReqId
+      // is present (legacy relay), the 30s timeout in createSession will eventually
+      // GC the entry — we no longer fall back to FIFO shift, which was the bug.
+      if (msg.clientReqId) {
+        pendingKeyPairsRef.current.delete(msg.clientReqId);
+      }
       setCreateError(msg.error);
       if (createErrorTimerRef.current) clearTimeout(createErrorTimerRef.current);
       createErrorTimerRef.current = setTimeout(() => setCreateError(null), 5000);

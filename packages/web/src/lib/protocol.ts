@@ -25,6 +25,7 @@ export interface PtyCreated extends BaseMessage {
   sessionId: string;
   publicKey: string;
   signature: string;
+  clientReqId?: string; // browser-supplied correlation ID, echoed by agent for matching
 }
 
 export interface PtyData extends BaseMessage {
@@ -71,6 +72,7 @@ export interface PtyCreateError extends BaseMessage {
   type: 'pty.create.error';
   agentId: string;
   error: string;
+  clientReqId?: string; // matches the clientReqId sent in pty.create so browser can clean up its keyPair Map
 }
 
 // File transfer: Relay → Browser
@@ -108,6 +110,7 @@ export interface BrowserPtyCreate extends BaseMessage {
   shell: string;
   cwd: string;
   publicKey: string;
+  clientReqId: string; // required: correlation ID for matching pty.created back to the keyPair we generated
 }
 
 export interface BrowserPtyData extends BaseMessage {
