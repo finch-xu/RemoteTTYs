@@ -141,14 +141,15 @@ export function Sidebar({
         overflow: 'hidden',
       }}
     >
-      {/* Brand */}
+      {/* Brand + collapse/expand toggle (always at top so the button stays where the user clicked it) */}
       <div
         style={{
           padding: effectiveCollapsed ? '16px 0 12px' : '16px 16px 12px',
           display: 'flex',
+          flexDirection: effectiveCollapsed ? 'column' : 'row',
           alignItems: 'center',
           justifyContent: effectiveCollapsed ? 'center' : 'space-between',
-          gap: 8,
+          gap: effectiveCollapsed ? 8 : 8,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
@@ -179,15 +180,15 @@ export function Sidebar({
             </div>
           )}
         </div>
-        {!effectiveCollapsed && !drawerMode && (
+        {!drawerMode && (
           <IconButton
             size={26}
             tone="muted"
-            onClick={() => setCollapsed(true)}
-            title="Collapse sidebar"
-            aria-label="Collapse sidebar"
+            onClick={() => setCollapsed((c) => !c)}
+            title={effectiveCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={effectiveCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            <Icons.ChevronLeft size={15} />
+            {effectiveCollapsed ? <Icons.ChevronRight size={15} /> : <Icons.ChevronLeft size={15} />}
           </IconButton>
         )}
       </div>
@@ -424,7 +425,15 @@ export function Sidebar({
             </div>
           </div>
         )}
-        <div style={{ display: 'flex', gap: 2 }}>
+        <div
+          style={{
+            display: 'flex',
+            // Collapsed sidebar is 58px wide — two 28px buttons + gap can't sit horizontally,
+            // so stack them vertically. Expanded width can fit them in a row.
+            flexDirection: effectiveCollapsed ? 'column' : 'row',
+            gap: effectiveCollapsed ? 4 : 2,
+          }}
+        >
           <IconButton
             size={28}
             onClick={toggleTheme}
@@ -445,17 +454,6 @@ export function Sidebar({
           >
             <Icons.LogOut size={15} />
           </IconButton>
-          {effectiveCollapsed && !drawerMode && (
-            <IconButton
-              size={28}
-              tone="muted"
-              onClick={() => setCollapsed(false)}
-              title="Expand sidebar"
-              aria-label="Expand sidebar"
-            >
-              <Icons.ChevronRight size={15} />
-            </IconButton>
-          )}
         </div>
       </div>
     </aside>
