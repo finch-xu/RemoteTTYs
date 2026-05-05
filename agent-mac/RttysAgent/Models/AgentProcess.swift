@@ -11,6 +11,7 @@ final class AgentProcess {
     }
 
     private(set) var state: State = .stopped
+    private(set) var runningSince: Date?
 
     var isRunning: Bool {
         if case .running = state { return true }
@@ -54,6 +55,7 @@ final class AgentProcess {
         let hadTrackedProcess = process != nil
         terminateProcess()
         state = .stopped
+        runningSince = nil
         if !hadTrackedProcess {
             Task { await self.runCLIStop() }
         }
@@ -120,10 +122,12 @@ final class AgentProcess {
             try proc.run()
             self.process = proc
             state = .running(pid: proc.processIdentifier)
+            runningSince = Date()
             logStore?.append("[RttysAgent] Agent started (pid=\(proc.processIdentifier))")
         } catch {
             logStore?.append("[RttysAgent] Failed to start agent: \(error.localizedDescription)")
             state = .stopped
+            runningSince = nil
             scheduleRestart()
         }
     }
@@ -132,6 +136,7 @@ final class AgentProcess {
         stdoutPipe?.fileHandleForReading.readabilityHandler = nil
         stderrPipe?.fileHandleForReading.readabilityHandler = nil
         process = nil
+        runningSince = nil
 
         logStore?.append("[RttysAgent] Agent exited (code=\(exitCode))")
 

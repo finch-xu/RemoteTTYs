@@ -24,6 +24,7 @@ struct RttysAgentApp: App {
         } label: {
             menuBarLabel
         }
+        .menuBarExtraStyle(.window)
 
         Window("Configuration", id: "config") {
             ConfigView(
@@ -33,6 +34,7 @@ struct RttysAgentApp: App {
             )
         }
         .windowResizability(.contentSize)
+        .defaultSize(width: Theme.Config.width, height: Theme.Config.height)
 
         Window("Agent Logs", id: "logs") {
             LogView(logStore: logStore)

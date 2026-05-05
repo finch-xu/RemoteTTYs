@@ -1,11 +1,8 @@
 import SwiftUI
-import AppKit
 import Sparkle
 
 struct AboutView: View {
     var updater: SPUUpdater
-
-    private static let repositoryURL = URL(string: "https://github.com/finch-xu/RemoteTTYs")!
 
     var body: some View {
         VStack(spacing: 16) {
@@ -30,9 +27,7 @@ struct AboutView: View {
                 .multilineTextAlignment(.center)
 
             VStack(spacing: 8) {
-                Button {
-                    NSWorkspace.shared.open(Self.repositoryURL)
-                } label: {
+                Link(destination: Theme.repositoryURL) {
                     Label("View on GitHub", systemImage: "arrow.up.right.square")
                         .frame(maxWidth: .infinity)
                 }
